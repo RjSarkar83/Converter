@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="400" viewBox="0 0 560 400">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#818cf8"/></linearGradient></defs>
+<rect x="8" y="8" width="544" height="384" rx="14" fill="#0d1117" stroke="url(#g)" stroke-width="4"/>
+<g id="shapes">
+<rect x="40" y="50" width="150" height="100" rx="10" fill="#2563eb"/>
+<circle cx="330" cy="100" r="55" fill="#dc2626"/>
+<polygon points="460,50 520,150 400,150" fill="#16a34a"/>
+<path d="M40,300 C140,220 220,380 320,300 S460,260 520,320" fill="none" stroke="#fbbf24" stroke-width="6"/>
+</g>
+<g id="labels">
+<text x="40" y="200" font-family="Arial" font-size="30" fill="#ffffff">PDFLayer Studio</text>
+<text x="40" y="235" font-family="Arial" font-size="16" fill="#9aa7bd">Vector shapes + live text demo</text>
+<text x="330" y="230" font-family="Arial" font-size="20" fill="#22d3ee">100% vector</text>
+</g>
+</svg>
