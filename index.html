@@ -122,7 +122,7 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
   </div>
   <div class="queue" id="q-color"></div>
 </div>
-<footer>© 2026 <b>ArtViSiON</b> by RJ Sarkar/Designer</footer>
+<footer>© 2026 <b>ArtViSiON</b> by RJ Sarkar/Designer · Build 25-CDR</footer>
 </div>
 <script>
 (function(){
@@ -263,26 +263,10 @@ function jpegPdfFallback(jpeg, w, h, dpi){
 }
 async function toPdfFromCanvases(canvases){
   const dpi=pdfDpi();
-  const pages=[];
-  for(const raw of canvases){
-    const c=capCanvas(raw);
-    const blob=await canvasJpeg(c,0.93);
-    pages.push({c, bytes:new Uint8Array(await blob.arrayBuffer())});
-  }
-  await window.__avNeed('PDFLib');
-  if(window.PDFLib && PDFLib.PDFDocument){
-    const pdf=await PDFLib.PDFDocument.create();
-    pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
-    for(const p of pages){
-      const img=await pdf.embedJpg(p.bytes);
-      let pw=img.width*72/dpi, ph=img.height*72/dpi;
-      const cap=14400; if(pw>cap||ph>cap){const s=Math.min(cap/pw,cap/ph); pw*=s; ph*=s}
-      const page=pdf.addPage([pw,ph]);
-      page.drawImage(img,{x:0,y:0,width:pw,height:ph});
-    }
-    return new Blob([await pdf.save()],{type:'application/pdf'});
-  }
-  return jpegPdfFallback(pages[0].bytes, pages[0].c.width, pages[0].c.height, dpi);
+  const c=capCanvas(canvases[0]);
+  const blob=await canvasJpeg(c,0.93);
+  const bytes=new Uint8Array(await blob.arrayBuffer());
+  return jpegPdfFallback(bytes, c.width, c.height, dpi);
 }
 
 async function inflateRaw(bytes){
@@ -441,22 +425,113 @@ async function tiffToCanvas(buf){
   throw new Error('Could not read TIFF (need uncompressed/JPEG TIFF, or upload vendor/utif.min.js).');
 }
 
+function dibToCanvas(dib){
+  const a=u8(dib);
+  if(a.length<40) throw new Error('DIB too small');
+  const hdr=le32(a,0);
+  if(hdr<40) throw new Error('DIB header');
+  const w=a[4]|a[5]<<8|a[6]<<16|a[7]<<24; // signed via | 
+  const hs=a[8]|a[9]<<8|a[10]<<16|a[11]<<24;
+  const width=w>0x7fffffff?w-0x100000000:w;
+  const heightRaw=hs>0x7fffffff?hs-0x100000000:hs;
+  const bottomUp=heightRaw>0;
+  const height=Math.abs(heightRaw);
+  const bpp=le16(a,14);
+  const comp=le32(a,16);
+  const clrUsed=le32(a,32);
+  if(width<1||height<1||width>8000||height>8000) throw new Error('DIB size');
+  if(comp!==0 && comp!==3) throw new Error('DIB compressed');
+  let palOff=hdr, palN=0;
+  if(bpp<=8){ palN=clrUsed||(1<<bpp); }
+  const pal=[];
+  for(let i=0;i<palN;i++){
+    const o=palOff+i*4;
+    pal.push([a[o+2],a[o+1],a[o],255]);
+  }
+  let pix=palOff+palN*4;
+  const stride=((width*bpp+31)>>5)<<2;
+  const cnv=document.createElement('canvas'); cnv.width=width; cnv.height=height;
+  const img=cnv.getContext('2d').createImageData(width,height);
+  const d=img.data;
+  for(let y=0;y<height;y++){
+    const row=bottomUp?height-1-y:y;
+    const rs=pix+row*stride;
+    for(let x=0;x<width;x++){
+      const o=(y*width+x)*4;
+      if(bpp===32){ d[o]=a[rs+x*4+2]; d[o+1]=a[rs+x*4+1]; d[o+2]=a[rs+x*4]; d[o+3]=255; }
+      else if(bpp===24){ d[o]=a[rs+x*3+2]; d[o+1]=a[rs+x*3+1]; d[o+2]=a[rs+x*3]; d[o+3]=255; }
+      else if(bpp===8){ const c=pal[a[rs+x]]||[0,0,0,255]; d[o]=c[0]; d[o+1]=c[1]; d[o+2]=c[2]; d[o+3]=255; }
+      else if(bpp===4){
+        const v=a[rs+(x>>1)]; const idx=(x&1)?(v&15):(v>>4); const c=pal[idx]||[0,0,0,255];
+        d[o]=c[0]; d[o+1]=c[1]; d[o+2]=c[2]; d[o+3]=255;
+      } else { d[o]=d[o+1]=d[o+2]=0; d[o+3]=255; }
+    }
+  }
+  cnv.getContext('2d').putImageData(img,0,0);
+  return cnv;
+}
+function riffCdrCanvas(buf){
+  const a=u8(buf);
+  if(ascii(a,0,4)!=='RIFF') return null;
+  let best=null, bestArea=0;
+  let pos=12;
+  while(pos+8<=a.length){
+    const id=ascii(a,pos,4);
+    const clen=le32(a,pos+4);
+    const dataOff=pos+8;
+    const data=a.subarray(dataOff, Math.min(a.length, dataOff+clen));
+    if(id==='DISP' && data.length>44){
+      let dib=data;
+      const cf=le32(data,0);
+      if(cf===8 || cf===2) dib=data.subarray(4); // CF_DIB
+      try{
+        const c=dibToCanvas(dib);
+        const area=c.width*c.height;
+        if(area>bestArea){ best=c; bestArea=area; }
+      }catch(e){}
+    }
+    pos+=8+clen+(clen&1);
+    if(clen>50e6) break;
+  }
+  return best;
+}
 async function previewFromBinary(buf){
   const a=u8(buf);
-  if(ascii(a,0,5)==='%PDF-') return {pdf:new Blob([a],{type:'application/pdf'})};
+  for(let i=0;i<Math.min(a.length,1200000);i++){
+    if(a[i]===0x25&&a[i+1]===0x50&&a[i+2]===0x44&&a[i+3]===0x46&&a[i+4]===0x2d){
+      return {pdf:new Blob([a.slice(i)],{type:'application/pdf'})};
+    }
+  }
+  if(a[0]===0xC5&&a[1]===0xD0&&a[2]===0xD3&&a[3]===0xC6){
+    const tiffOff=le32(a,20), tiffLen=le32(a,24);
+    if(tiffOff>0 && tiffLen>32 && tiffOff+tiffLen<=a.length){
+      try{ return {canvas: await tiffToCanvas(a.slice(tiffOff, tiffOff+tiffLen))}; }catch(e){}
+    }
+  }
+  const riff=riffCdrCanvas(a);
+  if(riff) return {canvas:riff};
   if(a[0]===0x50&&a[1]===0x4b){
     const ents=await unzipEntries(a);
     const prefer=ents.filter(e=>/thumb|preview|\.png|\.jpg|\.jpeg|\.bmp/i.test(e.name));
     for(const e of prefer.concat(ents)){
-      const imgs=findImageBlobs(e.data);
-      if(imgs[0]){ try{return {canvas:await blobToCanvas(new Blob([imgs[0].bytes],{type:imgs[0].type}))} }catch(x){} }
+      try{
+        if(/\.(bmp)$/i.test(e.name) && e.data[0]===0x42){
+          return {canvas: await blobToCanvas(new Blob([e.data],{type:'image/bmp'}))};
+        }
+        const imgs=findImageBlobs(e.data);
+        if(imgs[0]) return {canvas:await blobToCanvas(new Blob([imgs[0].bytes],{type:imgs[0].type}))};
+        if(ascii(e.data,0,4)==='RIFF'){
+          const c=riffCdrCanvas(e.data);
+          if(c) return {canvas:c};
+        }
+      }catch(x){}
     }
   }
   const imgs=findImageBlobs(a);
   for(const im of imgs){
     try{return {canvas:await blobToCanvas(new Blob([im.bytes],{type:im.type}))} }catch(x){}
   }
-  throw new Error('No preview or PDF stream inside this file.');
+  throw new Error('CDR/AI/EPS: no preview bitmap in this file. Export PDF from Corel/Illustrator for vectors.');
 }
 
 /* ASCII DXF → vector PDF (LINE, LWPOLYLINE, POLYLINE, CIRCLE, ARC, TEXT) */
@@ -919,5 +994,5 @@ async function handle(files, tool){
 }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a403bfc4fe8b3e46',t:'MTc5MDI3MzQ1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4044daf9ff2ff99',t:'MTc5MDI3OTI3Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
