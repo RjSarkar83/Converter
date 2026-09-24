@@ -50,6 +50,20 @@ h1 .on{color:var(--ink)}
 .btn.p{background:var(--ink);color:#fff;border:0}
 .note{color:var(--mut);font-size:12.5px;margin-top:8px}
 .err{color:#e24a4a}
+.prevwrap{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:720px){.prevwrap{grid-template-columns:1fr}}
+.prevbox{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0c0c0c}
+.prevbox h3{margin:0;padding:8px 10px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line)}
+.prevbox canvas,.prevbox img{display:block;width:100%;height:auto;max-height:280px;object-fit:contain;background:#111;cursor:crosshair}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-top:12px}
+.sw{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#0c0c0c;font-size:11px}
+.chip{height:36px}
+.sw dl{margin:0;padding:8px 10px;display:grid;grid-template-columns:52px 1fr;gap:2px 8px}
+.sw dt{color:var(--mut);font-weight:700;letter-spacing:.4px}
+.sw dd{margin:0;font-variant-numeric:tabular-nums}
+.live{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;display:none;align-items:center;gap:10px}
+.live.on{display:flex}
+.live .chip2{width:48px;height:48px;border-radius:8px;border:1px solid var(--line);flex-shrink:0}
 footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:var(--mut);font-size:12px}
 footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-size:15px}
 </style>
@@ -66,8 +80,8 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 </header>
 <div class="tabs">
   <button class="tab on" data-t="pdf">PDF Converter<small>PSD AI CDR EPS SVG TIFF DXF</small></button>
-  <button class="tab" data-t="vec">Vectorize Art<small>Photo → B&amp;W SVG</small></button>
-  <button class="tab" data-t="color">Color Lab<small>RGB ⇄ CMYK proof</small></button>
+  <button class="tab" data-t="vec">Vectorize Art<small>Colour art · smooth SVG</small></button>
+  <button class="tab" data-t="color">Color Lab<small>RGB · HEX · CMYK · Pantone</small></button>
 </div>
 <div class="pane on" id="pane-pdf">
   <div class="drop" id="drop-pdf">
@@ -87,11 +101,12 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 <div class="pane" id="pane-vec">
   <div class="drop" id="drop-vec">
     <h2>Drop photos or logos</h2>
-    <p>High-quality path tracing. Logo = sharp 2-colour. Print = extra detail. Color = poster vectors.</p>
+    <p>Smooth colour-art SVG: few clean fills, curved paths. HQ = more colours and finer detail.</p>
     <div class="qbar">
-      <label><input type="radio" name="vecq" value="logo" checked> Logo sharp</label>
-      <label><input type="radio" name="vecq" value="print"> Print detail</label>
-      <label><input type="radio" name="vecq" value="color"> Color poster</label>
+      <label><input type="radio" name="vecq" value="art" checked> Color art</label>
+      <label><input type="radio" name="vecq" value="hq"> HQ colour</label>
+      <label><input type="radio" name="vecq" value="logo"> Logo B&amp;W</label>
+      <label><input type="radio" name="vecq" value="print"> Print B&amp;W</label>
     </div>
     <button class="browse" type="button">Browse images</button>
     <input type="file" id="file-vec" hidden multiple accept="image/*">
@@ -143,6 +158,7 @@ const $=s=>document.querySelector(s);
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+b.dataset.t));
+  if(b.dataset.t==='vec' && window.__avNeed) window.__avNeed('ImageTracer');
 });
 function wire(id, tool){
   const drop=$('#drop-'+id), fi=$('#file-'+id);
@@ -193,10 +209,11 @@ async function blobToCanvas(blob){
   try{
     const img=new Image();
     await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('Could not decode image'));img.src=url});
+    let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    if(!w||!h){ w=1200; h=1200; }
     const c=document.createElement('canvas');
-    c.width=img.naturalWidth||img.width; c.height=img.naturalHeight||img.height;
-    if(!c.width) throw new Error('Empty image');
-    c.getContext('2d').drawImage(img,0,0); return c;
+    c.width=w; c.height=h;
+    const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(img,0,0,w,h); return c;
   }finally{URL.revokeObjectURL(url)}
 }
 async function fileToCanvas(f){return blobToCanvas(f)}
@@ -321,11 +338,30 @@ function packbits(src, o, n){
   }
   return {data:out, next:p};
 }
+function psdThumbnailJpeg(a){
+  let o=26;
+  o+=4+be32(a,o);
+  const irl=be32(a,o); o+=4;
+  const end=Math.min(a.length,o+irl);
+  while(o+12<=end){
+    if(ascii(a,o,4)!=='8BIM'){o++;continue}
+    o+=4;
+    const id=be16(a,o); o+=2;
+    const nlen=a[o]; o+=1+nlen; if((nlen+1)%2) o++;
+    if(o+4>end) break;
+    const sz=be32(a,o); o+=4;
+    if((id===1036||id===1033)&&sz>32){
+      return a.slice(o+28, Math.min(o+sz, a.length));
+    }
+    o+=sz; if(sz%2) o++;
+  }
+  return null;
+}
 function psdToCanvas(buf){
   const a=u8(buf);
   if(ascii(a,0,4)!=='8BPS') throw new Error('Not a Photoshop PSD');
-  const ch=be16(a,12), h=be32(a,14), w=be32(a,18), depth=be16(a,22);
-  if(w>8000||h>8000) throw new Error('PSD too large for browser ('+w+'×'+h+')');
+  const ch=be16(a,12), h=be32(a,14), w=be32(a,18), depth=be16(a,22), mode=be16(a,24);
+  if(w<1||h<1||w>14000||h>14000) throw new Error('PSD size not supported ('+w+'×'+h+')');
   let o=26;
   o+=4+be32(a,o);
   o+=4+be32(a,o);
@@ -333,53 +369,76 @@ function psdToCanvas(buf){
   const comp=be16(a,o); o+=2;
   const n=w*h;
   const planes=[];
-  if(comp===0){
-    const bpp=depth===16?2:1;
-    for(let c=0;c<ch;c++){
-      const sl=a.subarray(o,o+n*bpp); o+=n*bpp;
-      const p=new Uint8Array(n);
-      if(bpp===1) p.set(sl); else for(let i=0;i<n;i++) p[i]=sl[i*2];
-      planes.push(p);
-    }
-  } else if(comp===1){
-    const rowBytes=new Array(ch*h);
-    for(let i=0;i<ch*h;i++){ rowBytes[i]=be16(a,o); o+=2; }
-    for(let c=0;c<ch;c++){
-      const p=new Uint8Array(n);
-      for(let y=0;y<h;y++){
-        const {data}=packbits(a,o,w);
-        p.set(data,y*w); o+=rowBytes[c*h+y];
+  const bpp=depth===16?2:1;
+  try{
+    if(comp===0){
+      for(let c=0;c<ch;c++){
+        const sl=a.subarray(o,o+n*bpp); o+=n*bpp;
+        const p=new Uint8Array(n);
+        if(bpp===1) p.set(sl.subarray(0,n)); else for(let i=0;i<n;i++) p[i]=sl[i*2];
+        planes.push(p);
       }
-      planes.push(p);
-    }
-  } else throw new Error('PSD compression '+comp+' not supported');
+    } else if(comp===1){
+      const rowBytes=new Array(ch*h);
+      for(let i=0;i<ch*h;i++){ rowBytes[i]=be16(a,o); o+=2; }
+      for(let c=0;c<ch;c++){
+        const p=new Uint8Array(n);
+        for(let y=0;y<h;y++){
+          const {data}=packbits(a,o,w);
+          p.set(data,y*w); o+=rowBytes[c*h+y]||w;
+        }
+        planes.push(p);
+      }
+    } else throw new Error('comp');
+  }catch(err){
+    throw new Error('PSD composite unreadable');
+  }
   const cnv=document.createElement('canvas'); cnv.width=w; cnv.height=h;
   const img=cnv.getContext('2d').createImageData(w,h);
   const d=img.data;
   for(let i=0;i<n;i++){
-    if(ch>=3){ d[i*4]=planes[0][i]; d[i*4+1]=planes[1][i]; d[i*4+2]=planes[2][i]; d[i*4+3]=ch>=4?planes[3][i]:255; }
-    else { const v=planes[0][i]; d[i*4]=d[i*4+1]=d[i*4+2]=v; d[i*4+3]=ch>=2?planes[1][i]:255; }
+    if(mode===4 && planes.length>=4){
+      const C=planes[0][i]/255, M=planes[1][i]/255, Y=planes[2][i]/255, K=planes[3][i]/255;
+      d[i*4]=255*(1-C)*(1-K); d[i*4+1]=255*(1-M)*(1-K); d[i*4+2]=255*(1-Y)*(1-K); d[i*4+3]=255;
+    } else if(planes.length>=3){
+      d[i*4]=planes[0][i]; d[i*4+1]=planes[1][i]; d[i*4+2]=planes[2][i]; d[i*4+3]=planes.length>=4?planes[3][i]:255;
+    } else {
+      const v=planes[0]?planes[0][i]:0; d[i*4]=d[i*4+1]=d[i*4+2]=v; d[i*4+3]=255;
+    }
   }
   cnv.getContext('2d').putImageData(img,0,0);
   return cnv;
 }
-
-function tiffToCanvas(buf){
-  const U=window.UTIF;
-  if(!U){
-    const imgs=findImageBlobs(buf);
-    if(!imgs.length) throw new Error('TIFF decoder missing and no embedded JPEG.');
-    throw new Error('TIFF needs vendor/utif.min.js');
+async function psdFileToCanvas(buf){
+  try{ return psdToCanvas(buf); }
+  catch(e){
+    const jpg=psdThumbnailJpeg(u8(buf));
+    if(jpg) return blobToCanvas(new Blob([jpg],{type:'image/jpeg'}));
+    throw e;
   }
-  const ifds=U.decode(u8(buf).buffer);
-  if(!ifds||!ifds.length) throw new Error('Empty TIFF');
-  U.decodeImage(buf, ifds[0]);
-  const rgba=U.toRGBA8(ifds[0]);
-  const w=ifds[0].width, h=ifds[0].height;
-  const c=document.createElement('canvas'); c.width=w; c.height=h;
-  const id=c.getContext('2d').createImageData(w,h);
-  id.data.set(rgba); c.getContext('2d').putImageData(id,0,0);
-  return c;
+}
+
+async function tiffToCanvas(buf){
+  const raw=u8(buf);
+  const U=window.UTIF;
+  if(U && U.decode){
+    try{
+      const ab=raw.buffer.slice(raw.byteOffset, raw.byteOffset+raw.byteLength);
+      const ifds=U.decode(ab);
+      if(ifds&&ifds.length){
+        U.decodeImage(ab, ifds[0]);
+        const rgba=U.toRGBA8(ifds[0]);
+        const w=ifds[0].width, h=ifds[0].height;
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        const id=c.getContext('2d').createImageData(w,h);
+        id.data.set(rgba); c.getContext('2d').putImageData(id,0,0);
+        return c;
+      }
+    }catch(e){}
+  }
+  const imgs=findImageBlobs(raw);
+  if(imgs[0]) return blobToCanvas(new Blob([imgs[0].bytes],{type:imgs[0].type}));
+  throw new Error('Could not read TIFF (need uncompressed/JPEG TIFF, or upload vendor/utif.min.js).');
 }
 
 async function previewFromBinary(buf){
@@ -485,7 +544,7 @@ async function dxfToPdf(text){
   return new Blob([await pdf.save()],{type:'application/pdf'});
 }
 
-function vecMode(){const el=document.querySelector('input[name=vecq]:checked'); return (el&&el.value)||'logo'}
+function vecMode(){const el=document.querySelector('input[name=vecq]:checked'); return (el&&el.value)||'art'}
 function contrastStretch(id){
   const p=id.data; let mn=255,mx=0;
   for(let i=0;i<p.length;i+=4){ const y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; if(y<mn)mn=y; if(y>mx)mx=y; }
@@ -497,19 +556,79 @@ function contrastStretch(id){
   }
   return id;
 }
+function boxBlur(id, r){
+  if(r<1) return id;
+  const {width:w,height:h,data:p}=id;
+  const src=new Uint8ClampedArray(p);
+  const pass=(dx,dy)=>{
+    const tmp=new Uint8ClampedArray(p);
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      let R=0,G=0,B=0,n=0;
+      for(let k=-r;k<=r;k++){
+        const xx=x+k*dx, yy=y+k*dy;
+        if(xx<0||yy<0||xx>=w||yy>=h) continue;
+        const i=(yy*w+xx)*4; R+=src[i]; G+=src[i+1]; B+=src[i+2]; n++;
+      }
+      const o=(y*w+x)*4; tmp[o]=R/n; tmp[o+1]=G/n; tmp[o+2]=B/n; tmp[o+3]=255;
+    }
+    p.set(tmp); src.set(tmp);
+  };
+  pass(1,0); pass(0,1);
+  return id;
+}
+function kmeansPalette(id, k){
+  const p=id.data, n=p.length/4, pts=[];
+  const step=Math.max(1, Math.floor(n/5000));
+  for(let i=0;i<n;i+=step) pts.push([p[i*4],p[i*4+1],p[i*4+2]]);
+  const pal=[];
+  const stride=Math.max(1, Math.floor(pts.length/k));
+  for(let i=0;i<k;i++) pal.push(pts[Math.min(pts.length-1,i*stride)].slice());
+  for(let it=0;it<10;it++){
+    const acc=pal.map(()=>[0,0,0,0]);
+    for(const c of pts){
+      let bi=0,bd=1e12;
+      for(let j=0;j<k;j++){
+        const d=(c[0]-pal[j][0])**2+(c[1]-pal[j][1])**2+(c[2]-pal[j][2])**2;
+        if(d<bd){bd=d;bi=j}
+      }
+      acc[bi][0]+=c[0]; acc[bi][1]+=c[1]; acc[bi][2]+=c[2]; acc[bi][3]++;
+    }
+    for(let j=0;j<k;j++) if(acc[j][3]) pal[j]=[acc[j][0]/acc[j][3],acc[j][1]/acc[j][3],acc[j][2]/acc[j][3]];
+  }
+  return pal.map(c=>({r:Math.round(c[0]),g:Math.round(c[1]),b:Math.round(c[2]),a:255}));
+}
+function applyPalette(id, pal){
+  const p=id.data;
+  for(let i=0;i<p.length;i+=4){
+    let bi=0,bd=1e12;
+    for(let j=0;j<pal.length;j++){
+      const d=(p[i]-pal[j].r)**2+(p[i+1]-pal[j].g)**2+(p[i+2]-pal[j].b)**2;
+      if(d<bd){bd=d;bi=j}
+    }
+    p[i]=pal[bi].r; p[i+1]=pal[bi].g; p[i+2]=pal[bi].b; p[i+3]=255;
+  }
+  return id;
+}
 function prepTraceCanvas(src){
   const mode=vecMode();
-  const max=mode==='print'?2400: mode==='color'?1800: 2000;
+  const max=mode==='print'?2400: mode==='hq'?2200: mode==='art'?1600: 2000;
   const s=Math.min(1, max/Math.max(src.width,src.height));
   const w=Math.max(1,Math.round(src.width*s)), h=Math.max(1,Math.round(src.height*s));
   const c=document.createElement('canvas'); c.width=w; c.height=h;
   const g=c.getContext('2d');
   g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
   g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(src,0,0,w,h);
-  if(mode!=='color'){
-    const id=contrastStretch(g.getImageData(0,0,w,h));
-    g.putImageData(id,0,0);
+  let id=g.getImageData(0,0,w,h);
+  if(mode==='art'||mode==='hq'){
+    boxBlur(id, mode==='art'?2:1);
+    const k=mode==='art'?8:16;
+    const pal=kmeansPalette(id,k);
+    applyPalette(id, pal);
+    c._pal=pal;
+  } else {
+    contrastStretch(id);
   }
+  g.putImageData(id,0,0);
   return c;
 }
 function rdp(pts, eps){
@@ -554,10 +673,14 @@ function vectorizeCanvas(src){
   const id=g.getImageData(0,0,c.width,c.height);
   const T=window.ImageTracer;
   const mode=vecMode();
-  const opt= mode==='color' ? {
-    numberofcolors:16, colorsampling:2, pathomit:2, ltres:0.5, qtres:0.5,
-    rightangleenhance:true, strokewidth:0, linefilter:false, viewbox:true,
-    roundcoords:2, scale:1, blurradius:0, colorquantcycles:5, mincolorratio:0
+  const opt= mode==='art' ? {
+    numberofcolors:8, colorsampling:0, pal:c._pal, pathomit:10, ltres:1.2, qtres:1.2,
+    rightangleenhance:false, strokewidth:0, linefilter:true, viewbox:true,
+    roundcoords:2, scale:1, blurradius:0, colorquantcycles:3, mincolorratio:0.012
+  } : mode==='hq' ? {
+    numberofcolors:16, colorsampling:0, pal:c._pal, pathomit:3, ltres:0.45, qtres:0.45,
+    rightangleenhance:false, strokewidth:0, linefilter:false, viewbox:true,
+    roundcoords:2, scale:1, blurradius:0, colorquantcycles:4, mincolorratio:0.004
   } : mode==='print' ? {
     numberofcolors:2, colorsampling:0, pathomit:1, ltres:0.35, qtres:0.35,
     rightangleenhance:true, strokewidth:0, linefilter:false, viewbox:true,
@@ -585,14 +708,103 @@ function vectorizeCanvas(src){
   }
   return d+'</svg>';
 }
+function rgbToCmykVals(r,g,b){
+  const R=r/255,G=g/255,B=b/255, k=1-Math.max(R,G,B);
+  if(k>=0.999) return {c:0,m:0,y:0,k:100};
+  return {
+    c:Math.round((1-R-k)/(1-k)*100),
+    m:Math.round((1-G-k)/(1-k)*100),
+    y:Math.round((1-B-k)/(1-k)*100),
+    k:Math.round(k*100)
+  };
+}
+function hexOf(r,g,b){return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase()}
+const PMS=[
+  ['White',255,255,255],['Black',0,0,0],['Cool Gray 1 C',218,217,214],['Cool Gray 5 C',177,179,179],['Cool Gray 9 C',117,120,123],['Cool Gray 11 C',83,86,90],
+  ['Warm Gray 3 C',191,184,175],['Warm Gray 8 C',140,130,121],['Warm Gray 11 C',110,98,89],
+  ['Yellow C',254,221,0],['Yellow 012 C',255,215,0],['Process Yellow C',246,224,94],
+  ['Orange 021 C',254,80,0],['Bright Orange C',255,94,14],
+  ['Red 032 C',239,51,64],['Warm Red C',249,56,34],['Rubine Red C',206,0,88],['Rhodamine Red C',225,0,152],
+  ['186 C',200,16,46],['185 C',228,0,43],['485 C',218,41,28],['199 C',213,0,50],['200 C',186,12,47],['201 C',157,34,53],['202 C',134,38,51],
+  ['Pantone Red C',237,41,57],['1797 C',203,51,59],['1807 C',164,52,58],
+  ['Pink C',214,37,152],['Process Magenta C',209,0,116],['Purple C',187,41,187],['Violet C',102,0,161],
+  ['Blue 072 C',16,6,159],['Reflex Blue C',0,20,137],['Process Blue C',0,133,202],['Cyan C',0,159,223],
+  ['286 C',0,51,160],['287 C',0,48,135],['288 C',0,45,114],['294 C',0,47,108],['299 C',0,163,224],['300 C',0,94,184],['301 C',0,75,135],
+  ['7461 C',0,125,186],['7462 C',0,89,132],['312 C',0,169,189],['320 C',0,156,166],['327 C',0,135,114],
+  ['Green C',0,171,132],['354 C',0,177,64],['355 C',0,150,57],['356 C',0,122,51],['347 C',0,154,68],['348 C',0,132,61],
+  ['368 C',88,180,32],['375 C',151,215,0],['382 C',196,214,0],
+  ['424 C',112,115,114],['425 C',84,88,90],['426 C',37,40,42],['447 C',55,58,54],
+  ['4625 C',79,44,29],['469 C',97,59,39],['476 C',78,54,41],['4975 C',67,39,35],
+  ['1205 C',248,224,142],['134 C',253,200,47],['137 C',255,163,0],['143 C',241,157,0],['151 C',255,130,0],['158 C',232,119,27],
+  ['165 C',255,103,31],['172 C',250,70,22],
+  ['542 C',123,175,212],['543 C',166,199,219],['544 C',189,213,230],
+  ['7408 C',246,190,0],['7413 C',220,134,51],['7421 C',101,28,50],['7427 C',151,27,47],
+  ['7473 C',87,162,157],['7482 C',0,143,84],['7499 C',241,230,178],['7533 C',71,56,46],
+  ['7547 C',19,30,46],['7621 C',171,36,40],['7627 C',96,30,32]
+];
+function nearestPms(r,g,b){
+  let best=PMS[0], bd=1e12;
+  for(const p of PMS){
+    const d=(r-p[1])**2+(g-p[2])**2+(b-p[3])**2;
+    if(d<bd){bd=d;best=p}
+  }
+  const dist=Math.sqrt(bd);
+  return {name:'PMS '+best[0], delta:Math.round(dist), r:best[1],g:best[2],b:best[3]};
+}
 function rgbToCmykCanvas(c){
   const ctx=c.getContext('2d'), d=ctx.getImageData(0,0,c.width,c.height), p=d.data;
   for(let i=0;i<p.length;i+=4){
-    const r=p[i]/255,g=p[i+1]/255,b=p[i+2]/255, k=1-Math.max(r,g,b);
-    let C=0,M=0,Y=0; if(k<1){C=(1-r-k)/(1-k);M=(1-g-k)/(1-k);Y=(1-b-k)/(1-k)}
+    const v=rgbToCmykVals(p[i],p[i+1],p[i+2]);
+    const k=v.k/100, C=v.c/100, M=v.m/100, Y=v.y/100;
     p[i]=255*(1-C)*(1-k); p[i+1]=255*(1-M)*(1-k); p[i+2]=255*(1-Y)*(1-k);
   }
   ctx.putImageData(d,0,0); return c;
+}
+function toneLine(r,g,b){
+  const cm=rgbToCmykVals(r,g,b), hx=hexOf(r,g,b), pms=nearestPms(r,g,b);
+  return {r,g,b,hx,cm,pms};
+}
+function swatchHTML(t, label){
+  return `<div class="sw"><div class="chip" style="background:${t.hx}"></div><dl>
+    <dt>Role</dt><dd>${label}</dd>
+    <dt>HEX</dt><dd>${t.hx}</dd>
+    <dt>RGB</dt><dd>${t.r}, ${t.g}, ${t.b}</dd>
+    <dt>CMYK</dt><dd>${t.cm.c} / ${t.cm.m} / ${t.cm.y} / ${t.cm.k}</dd>
+    <dt>Pantone</dt><dd>${t.pms.name} · Δ${t.pms.delta}</dd>
+  </dl></div>`;
+}
+function extractTones(c, n){
+  const max=180, s=Math.min(1, max/Math.max(c.width,c.height));
+  const w=Math.max(1,Math.round(c.width*s)), h=Math.max(1,Math.round(c.height*s));
+  const t=document.createElement('canvas'); t.width=w; t.height=h;
+  t.getContext('2d').drawImage(c,0,0,w,h);
+  const pal=kmeansPalette(t.getContext('2d').getImageData(0,0,w,h), n);
+  return pal.map(p=>toneLine(p.r,p.g,p.b));
+}
+function bindEyedrop(canvas, live){
+  canvas.onclick=e=>{
+    const r=canvas.getBoundingClientRect();
+    const x=Math.floor((e.clientX-r.left)/r.width*canvas.width);
+    const y=Math.floor((e.clientY-r.top)/r.height*canvas.height);
+    const p=canvas.getContext('2d').getImageData(Math.max(0,x),Math.max(0,y),1,1).data;
+    const t=toneLine(p[0],p[1],p[2]);
+    live.classList.add('on');
+    live.innerHTML=`<div class="chip2" style="background:${t.hx}"></div><div>
+      <b>Sample</b> ${t.hx} · RGB ${t.r},${t.g},${t.b} · CMYK ${t.cm.c}/${t.cm.m}/${t.cm.y}/${t.cm.k}<br>
+      ${t.pms.name} (approx, Δ${t.pms.delta})</div>`;
+  };
+}
+async function anyFileToCanvas(f){
+  const e=ext(f.name);
+  if(e==='tif'||e==='tiff') return tiffToCanvas(await f.arrayBuffer());
+  if(e==='psd'||e==='psb') return psdToCanvas(await f.arrayBuffer());
+  if(e==='svg') return blobToCanvas(new Blob([await f.text()],{type:'image/svg+xml'}));
+  if(e==='cdr'||e==='ai'||e==='eps'){
+    const got=await previewFromBinary(await f.arrayBuffer());
+    if(got.canvas) return got.canvas;
+    throw new Error('No preview inside this file.');
+  }
+  return fileToCanvas(f);
 }
 
 async function handle(files, tool){
@@ -603,8 +815,7 @@ async function handle(files, tool){
       const e=ext(f.name);
       if(tool==='vec'){
         let c;
-        if(e==='tif'||e==='tiff') c=tiffToCanvas(await f.arrayBuffer());
-        else c=await fileToCanvas(f);
+        c=await anyFileToCanvas(f);
         const svg=vectorizeCanvas(c);
         const mode=vecMode();
         const note=mode==='color'?'Color poster SVG (up to 16 fills, scalable paths).': mode==='print'?'Print-detail B&W SVG (fine paths, 2400px trace).':'Sharp logo SVG (2-colour, scalable).';
@@ -612,59 +823,63 @@ async function handle(files, tool){
         continue;
       }
       if(tool==='color'){
-        let c;
-        if(e==='tif'||e==='tiff') c=tiffToCanvas(await f.arrayBuffer());
-        else c=await fileToCanvas(f);
-        rgbToCmykCanvas(c);
-        const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
-        done(el,'CMYK proof JPEG.',[[f.name.replace(/\.[^.]+$/,'')+'_cmyk.jpg',blob,'Download proof']]);
+        const orig=anyFileToCanvas?await anyFileToCanvas(f):await fileToCanvas(f);
+        const proof=document.createElement('canvas');
+        proof.width=orig.width; proof.height=orig.height;
+        proof.getContext('2d').drawImage(orig,0,0);
+        rgbToCmykCanvas(proof);
+        const blob=await new Promise(r=>proof.toBlob(r,'image/jpeg',0.93));
+        const tones=extractTones(orig,8);
+        done(el,'Pantone names are nearest-library matches (not a licensed Pantone live deck). Click a preview to sample a pixel.',[[f.name.replace(/\.[^.]+$/,'')+'_cmyk.jpg',blob,'Download CMYK proof']]);
+        const extra=document.createElement('div');
+        extra.innerHTML=`<div class="prevwrap">
+          <div class="prevbox"><h3>RGB preview</h3></div>
+          <div class="prevbox"><h3>CMYK proof</h3></div>
+        </div><div class="live"></div><div class="swatches"></div>`;
+        const boxes=extra.querySelectorAll('.prevbox');
+        const c1=document.createElement('canvas'); c1.width=orig.width; c1.height=orig.height; c1.getContext('2d').drawImage(orig,0,0);
+        const c2=document.createElement('canvas'); c2.width=proof.width; c2.height=proof.height; c2.getContext('2d').drawImage(proof,0,0);
+        boxes[0].appendChild(c1); boxes[1].appendChild(c2);
+        const live=extra.querySelector('.live');
+        bindEyedrop(c1,live); bindEyedrop(c2,live);
+        extra.querySelector('.swatches').innerHTML=tones.map((t,i)=>swatchHTML(t, i===0?'Dominant':'Tone '+(i+1))).join('');
+        el.appendChild(extra);
         continue;
       }
-      /* PDF tab */
+      /* PDF tab — every listed format */
       if(e==='pdf'){ done(el,'Already PDF.',[[f.name,f,'Download PDF']]); continue; }
-      if(e==='dxf'){
-        const t=await f.text();
-        const pdf=await dxfToPdf(t);
-        done(el,'DXF vectors drawn as PDF lines/circles/text (ASCII DXF). Layers drawn; not AutoCAD OCG.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-        continue;
-      }
-      if(e==='svg'){
-        const t=await f.text();
-        const c=await blobToCanvas(new Blob([t],{type:'image/svg+xml'}));
-        const pdf=await toPdfFromCanvases([c]);
-        done(el,'SVG rendered to a PDF page (browser SVG engine).',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-        continue;
-      }
-      if(e==='psd'||e==='psb'){
-        const c=psdToCanvas(await f.arrayBuffer());
-        const pdf=await toPdfFromCanvases([c]);
-        done(el,'PSD merged composite (all visible layers as Photoshop flattened them). Blend-as-seen, not live Type layers.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-        continue;
-      }
-      if(e==='tif'||e==='tiff'){
-        const c=tiffToCanvas(await f.arrayBuffer());
-        const pdf=await toPdfFromCanvases([c]);
-        done(el,'TIFF page 1 → PDF.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-        continue;
-      }
       if(e==='ai'||e==='eps'||e==='cdr'){
-        const buf=await f.arrayBuffer();
-        const got=await previewFromBinary(buf);
-        if(got.pdf){ done(el, e==='ai'?'PDF-compatible Illustrator file (vectors kept).':'Embedded PDF stream.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',got.pdf,'Download PDF']]); continue; }
-        const pdf=await toPdfFromCanvases([got.canvas]);
-        done(el, e==='cdr'
-          ? 'CDR preview bitmap → PDF. Live Corel objects/text need CorelDRAW Export PDF.'
-          : 'Embedded preview → PDF. For vectors, save PDF from Illustrator.',
-          [[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-        continue;
+        try{
+          const got=await previewFromBinary(await f.arrayBuffer());
+          if(got.pdf){
+            done(el, e==='ai'?'PDF-compatible AI (vectors kept).':'Embedded PDF stream.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',got.pdf,'Download PDF']]);
+            continue;
+          }
+          if(got.canvas){
+            const pdf=await toPdfFromCanvases([got.canvas]);
+            done(el, e==='cdr'?'CDR preview → PDF (not live Corel objects).':'Preview image → PDF.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+            continue;
+          }
+        }catch(err){ /* fall through to raster */ }
       }
-      const c=await fileToCanvas(f);
+      const notes={
+        psd:'PSD merged composite → PDF.',
+        psb:'PSB merged composite → PDF.',
+        tif:'TIFF page 1 → PDF.',
+        tiff:'TIFF page 1 → PDF.',
+        svg:'SVG rendered → PDF.',
+        dxf:'DXF drawing → PDF.',
+        ai:'AI preview → PDF.',
+        eps:'EPS preview → PDF.',
+        cdr:'CDR preview → PDF.'
+      };
+      const c=await anyFileToCanvas(f);
       const pdf=await toPdfFromCanvases([c]);
-      done(el,'Image → PDF page.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+      done(el, notes[e]||'Image → PDF page.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
     }catch(err){ fail(el, err.message||String(err)); }
   }
 }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40397b94a6694dd',t:'MTc5MDI3MTgxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a403abdfbb3b94dd',t:'MTc5MDI3MjY0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
