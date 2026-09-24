@@ -34,6 +34,9 @@ h1 .on{color:var(--ink)}
 .drop:hover,.drop.over{border-color:var(--ink)}
 .drop h2{font-family:"Playfair Display",Georgia,serif;margin:0 0 8px;font-size:22px}
 .drop p{color:var(--mut);margin:4px 0}
+.qbar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:14px 0 4px}
+.qbar label{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;background:#0c0c0c}
+.qbar input{accent-color:var(--ink)}
 .browse{margin-top:12px;padding:10px 24px;border:0;border-radius:8px;background:var(--ink);color:#fff;font:800 11px Montserrat,sans-serif;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer}
 .queue{display:flex;flex-direction:column;gap:12px;margin-top:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px}
@@ -71,6 +74,11 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
     <h2>Drop design files here</h2>
     <p>PSD, AI, CDR, EPS, SVG, TIFF, DXF, PDF, JPG, PNG — converted on this device.</p>
     <p>DXF / SVG / PDF-AI keep vectors. PSD uses Photoshop’s merged composite. CDR uses Corel’s preview (not live Corel objects).</p>
+    <div class="qbar">
+      <label><input type="radio" name="pdfq" value="300" checked> Print 300 DPI</label>
+      <label><input type="radio" name="pdfq" value="600"> Press 600 DPI</label>
+      <label><input type="radio" name="pdfq" value="150"> Screen 150 DPI</label>
+    </div>
     <button class="browse" type="button">Browse files</button>
     <input type="file" id="file-pdf" hidden multiple accept=".psd,.psb,.ai,.cdr,.eps,.svg,.tif,.tiff,.dxf,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp">
   </div>
@@ -79,7 +87,12 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 <div class="pane" id="pane-vec">
   <div class="drop" id="drop-vec">
     <h2>Drop photos or logos</h2>
-    <p>Built-in black-and-white SVG tracer (no extra engine).</p>
+    <p>High-quality path tracing. Logo = sharp 2-colour. Print = extra detail. Color = poster vectors.</p>
+    <div class="qbar">
+      <label><input type="radio" name="vecq" value="logo" checked> Logo sharp</label>
+      <label><input type="radio" name="vecq" value="print"> Print detail</label>
+      <label><input type="radio" name="vecq" value="color"> Color poster</label>
+    </div>
     <button class="browse" type="button">Browse images</button>
     <input type="file" id="file-vec" hidden multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff">
   </div>
@@ -96,10 +109,43 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 </div>
 <footer>© 2026 <b>ArtViSiON</b> by RJ Sarkar/Designer</footer>
 </div>
-<script src="vendor/pdf-lib.min.js"></script>
-<script src="docs/vendor/pdf-lib.min.js"></script>
-<script src="vendor/utif.min.js"></script>
-<script src="docs/vendor/utif.min.js"></script>
+<script>
+(function(){
+function addScript(src){
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=src; s.async=true;
+    s.onload=()=>res(true);
+    s.onerror=()=>res(false);
+    document.head.appendChild(s);
+  });
+}
+const LIBS={
+  PDFLib:[
+    'docs/vendor/pdf-lib.min.js','vendor/pdf-lib.min.js',
+    'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+    'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'
+  ],
+  ImageTracer:[
+    'docs/vendor/imagetracer.min.js','vendor/imagetracer.min.js',
+    'https://cdn.jsdelivr.net/gh/jankovicsandras/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js'
+  ],
+  UTIF:[
+    'docs/vendor/utif.min.js','vendor/utif.min.js',
+    'https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js'
+  ]
+};
+async function need(flag){
+  if(window[flag]) return true;
+  for(const u of LIBS[flag]){
+    const ok=await addScript(u);
+    if(ok && window[flag]) return true;
+  }
+  return !!window[flag];
+}
+window.__avNeed=need;
+})();
+</script>
 <script>
 (function(){
 const $=s=>document.querySelector(s);
@@ -109,7 +155,7 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 });
 function wire(id, tool){
   const drop=$('#drop-'+id), fi=$('#file-'+id);
-  drop.onclick=e=>{if(e.target.tagName!=='BUTTON') fi.click()};
+  drop.onclick=e=>{const t=e.target.tagName; if(t==='BUTTON'||t==='INPUT'||t==='LABEL'||e.target.closest('.qbar')) return; fi.click()};
   drop.querySelector('.browse').onclick=e=>{e.stopPropagation();fi.click()};
   fi.onchange=()=>{handle([...fi.files],tool);fi.value=''};
   ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
@@ -146,7 +192,7 @@ function be32(a,i){return ((a[i]<<24)|(a[i+1]<<16)|(a[i+2]<<8)|a[i+3])>>>0}
 
 function pdfLib(){
   const P=window.PDFLib;
-  if(!P||!P.PDFDocument) throw new Error('PDF library not loaded. Upload vendor/pdf-lib.min.js next to this page, then refresh.');
+  if(!P||!P.PDFDocument) throw new Error('PDF engine loading… drop the file again in 2 seconds.');
   return P;
 }
 
@@ -164,18 +210,71 @@ async function blobToCanvas(blob){
 }
 async function fileToCanvas(f){return blobToCanvas(f)}
 
+function pdfDpi(){const el=document.querySelector('input[name=pdfq]:checked'); return parseInt(el&&el.value||'300',10)}
+function capCanvas(src){
+  const max=3600, s=Math.min(1, max/Math.max(src.width,src.height));
+  if(s>=1) return src;
+  const c=document.createElement('canvas');
+  c.width=Math.round(src.width*s); c.height=Math.round(src.height*s);
+  const g=c.getContext('2d'); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(src,0,0,c.width,c.height);
+  return c;
+}
+async function canvasJpeg(c,q){
+  const flat=document.createElement('canvas');
+  flat.width=c.width; flat.height=c.height;
+  const g=flat.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,flat.width,flat.height); g.drawImage(c,0,0);
+  return await new Promise((r,j)=>flat.toBlob(b=>b?r(b):j(new Error('jpeg')),'image/jpeg',q||0.93));
+}
+function jpegPdfFallback(jpeg, w, h, dpi){
+  const jpg=u8(jpeg);
+  const pw=+(w*72/dpi).toFixed(2), ph=+(h*72/dpi).toFixed(2);
+  const enc=new TextEncoder();
+  const parts=[]; let pos=0;
+  const push=u=>{parts.push(u); pos+=u.length};
+  const str=s=>push(enc.encode(s));
+  const xref=[];
+  str('%PDF-1.4\n');
+  const obj=(n,body)=>{xref[n]=pos; if(typeof body==='string') str(n+' 0 obj\n'+body+'\nendobj\n'); else { str(n+' 0 obj\n'); push(body); str('\nendobj\n'); }};
+  obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+pw+' '+ph+'] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+  const content='q '+pw+' 0 0 '+ph+' 0 0 cm /Im0 Do Q';
+  const imgHead=enc.encode('<< /Type /XObject /Subtype /Image /Width '+w+' /Height '+h+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpg.length+' >>\nstream\n');
+  const imgTail=enc.encode('\nendstream');
+  const img=new Uint8Array(imgHead.length+jpg.length+imgTail.length);
+  img.set(imgHead,0); img.set(jpg,imgHead.length); img.set(imgTail,imgHead.length+jpg.length);
+  obj(4,img);
+  obj(5,'<< /Length '+content.length+' >>\nstream\n'+content+'\nendstream');
+  const startX=pos; str('xref\n0 6\n0000000000 65535 f \n');
+  for(let i=1;i<=5;i++) str(('0000000000'+xref[i]).slice(-10)+' 00000 n \n');
+  str('trailer << /Size 6 /Root 1 0 R >>\nstartxref\n'+startX+'\n%%EOF');
+  let n=0; parts.forEach(p=>n+=p.length);
+  const out=new Uint8Array(n); n=0; parts.forEach(p=>{out.set(p,n); n+=p.length});
+  return new Blob([out],{type:'application/pdf'});
+}
 async function toPdfFromCanvases(canvases){
-  const {PDFDocument}=pdfLib();
-  const pdf=await PDFDocument.create();
-  pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
-  for(const c of canvases){
-    const blob=await canvasPng(c);
-    const img=await pdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
-    const s=Math.min(595/img.width, 842/img.height, 1);
-    const page=pdf.addPage([img.width*s, img.height*s]);
-    page.drawImage(img,{x:0,y:0,width:img.width*s,height:img.height*s});
+  const dpi=pdfDpi();
+  const pages=[];
+  for(const raw of canvases){
+    const c=capCanvas(raw);
+    const blob=await canvasJpeg(c,0.93);
+    pages.push({c, bytes:new Uint8Array(await blob.arrayBuffer())});
   }
-  return new Blob([await pdf.save()],{type:'application/pdf'});
+  await window.__avNeed('PDFLib');
+  if(window.PDFLib && PDFLib.PDFDocument){
+    const pdf=await PDFLib.PDFDocument.create();
+    pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
+    for(const p of pages){
+      const img=await pdf.embedJpg(p.bytes);
+      let pw=img.width*72/dpi, ph=img.height*72/dpi;
+      const cap=14400; if(pw>cap||ph>cap){const s=Math.min(cap/pw,cap/ph); pw*=s; ph*=s}
+      const page=pdf.addPage([pw,ph]);
+      page.drawImage(img,{x:0,y:0,width:pw,height:ph});
+    }
+    return new Blob([await pdf.save()],{type:'application/pdf'});
+  }
+  return jpegPdfFallback(pages[0].bytes, pages[0].c.width, pages[0].c.height, dpi);
 }
 
 async function inflateRaw(bytes){
@@ -395,23 +494,103 @@ async function dxfToPdf(text){
   return new Blob([await pdf.save()],{type:'application/pdf'});
 }
 
-function vectorizeCanvas(src){
-  const max=800, s=Math.min(1, max/Math.max(src.width,src.height));
+function vecMode(){const el=document.querySelector('input[name=vecq]:checked'); return (el&&el.value)||'logo'}
+function contrastStretch(id){
+  const p=id.data; let mn=255,mx=0;
+  for(let i=0;i<p.length;i+=4){ const y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; if(y<mn)mn=y; if(y>mx)mx=y; }
+  const span=Math.max(1, mx-mn);
+  for(let i=0;i<p.length;i+=4){
+    const y=(0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]-mn)/span;
+    const v=Math.max(0,Math.min(255, Math.round(Math.pow(y,0.92)*255)));
+    p[i]=p[i+1]=p[i+2]=v;
+  }
+  return id;
+}
+function prepTraceCanvas(src){
+  const mode=vecMode();
+  const max=mode==='print'?2400: mode==='color'?1800: 2000;
+  const s=Math.min(1, max/Math.max(src.width,src.height));
   const w=Math.max(1,Math.round(src.width*s)), h=Math.max(1,Math.round(src.height*s));
   const c=document.createElement('canvas'); c.width=w; c.height=h;
-  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(src,0,0,w,h);
-  const id=g.getImageData(0,0,w,h), p=id.data;
-  const bin=new Uint8Array(w*h); let sum=0;
+  const g=c.getContext('2d');
+  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(src,0,0,w,h);
+  if(mode!=='color'){
+    const id=contrastStretch(g.getImageData(0,0,w,h));
+    g.putImageData(id,0,0);
+  }
+  return c;
+}
+function rdp(pts, eps){
+  if(pts.length<3) return pts;
+  const a=pts[0], b=pts[pts.length-1];
+  const dx=b[0]-a[0], dy=b[1]-a[1], len=Math.hypot(dx,dy)||1;
+  let maxd=0, idx=0;
+  for(let i=1;i<pts.length-1;i++){
+    const d=Math.abs(dy*pts[i][0]-dx*pts[i][1]+b[0]*a[1]-b[1]*a[0])/len;
+    if(d>maxd){maxd=d;idx=i}
+  }
+  if(maxd<=eps) return [a,b];
+  const L=rdp(pts.slice(0,idx+1),eps), R=rdp(pts.slice(idx),eps);
+  return L.slice(0,-1).concat(R);
+}
+function pathContours(bin,w,h){
+  const vis=new Uint8Array(w*h);
+  const dirs=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+  const on=(x,y)=>x>=0&&y>=0&&x<w&&y<h&&bin[y*w+x];
+  const loops=[];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    if(!on(x,y)||vis[y*w+x]) continue;
+    if(on(x-1,y)&&on(x+1,y)&&on(x,y-1)&&on(x,y+1)) continue;
+    const pts=[]; let cx=x, cy=y, dir=0, guard=0;
+    do{
+      pts.push([cx,cy]); vis[cy*w+cx]=1;
+      let found=false;
+      for(let k=0;k<8;k++){
+        const nd=(dir+5+k)%8;
+        const nx=cx+dirs[nd][0], ny=cy+dirs[nd][1];
+        if(on(nx,ny)){ cx=nx; cy=ny; dir=nd; found=true; break; }
+      }
+      if(!found) break;
+    } while((cx!==x||cy!==y) && ++guard<w*h);
+    if(pts.length>8) loops.push(rdp(pts, vecMode()==='print'?0.7:1.05));
+  }
+  return loops;
+}
+function vectorizeCanvas(src){
+  const c=prepTraceCanvas(src);
+  const g=c.getContext('2d');
+  const id=g.getImageData(0,0,c.width,c.height);
+  const T=window.ImageTracer;
+  const mode=vecMode();
+  const opt= mode==='color' ? {
+    numberofcolors:16, colorsampling:2, pathomit:2, ltres:0.5, qtres:0.5,
+    rightangleenhance:true, strokewidth:0, linefilter:false, viewbox:true,
+    roundcoords:2, scale:1, blurradius:0, colorquantcycles:5, mincolorratio:0
+  } : mode==='print' ? {
+    numberofcolors:2, colorsampling:0, pathomit:1, ltres:0.35, qtres:0.35,
+    rightangleenhance:true, strokewidth:0, linefilter:false, viewbox:true,
+    roundcoords:2, scale:1, blurradius:0, colorquantcycles:4
+  } : {
+    numberofcolors:2, colorsampling:0, pathomit:3, ltres:0.45, qtres:0.45,
+    rightangleenhance:true, strokewidth:0, linefilter:true, viewbox:true,
+    roundcoords:2, scale:1, blurradius:0, colorquantcycles:4
+  };
+  if(T && typeof T.imagedataToSVG==='function'){
+    return T.imagedataToSVG(id, opt);
+  }
+  const p=id.data, w=c.width, h=c.height, bin=new Uint8Array(w*h);
+  let sum=0;
   for(let i=0,j=0;i<p.length;i+=4,j++){ const y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; sum+=y; bin[j]=y; }
-  const thr=sum/(w*h)*0.82;
+  const thr=sum/(w*h)*0.72;
   for(let j=0;j<bin.length;j++) bin[j]=bin[j]<thr?1:0;
-  let d=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="#111">`;
-  for(let y=0;y<h;y++){
-    let x=0; while(x<w){
-      if(!bin[y*w+x]){x++;continue}
-      let x2=x; while(x2<w && bin[y*w+x2]) x2++;
-      d+=`<rect x="${x}" y="${y}" width="${x2-x}" height="1"/>`; x=x2;
-    }
+  const loops=pathContours(bin,w,h);
+  let d=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" fill="#111" fill-rule="evenodd">`;
+  for(const loop of loops){
+    if(loop.length<3) continue;
+    d+=`<path d="M ${loop[0][0]} ${loop[0][1]}`;
+    for(let i=1;i<loop.length;i++) d+=` L ${loop[i][0]} ${loop[i][1]}`;
+    d+=' Z"/>';
   }
   return d+'</svg>';
 }
@@ -426,6 +605,9 @@ function rgbToCmykCanvas(c){
 }
 
 async function handle(files, tool){
+  if(tool==='pdf') await window.__avNeed('PDFLib');
+  if(tool==='vec') await window.__avNeed('ImageTracer');
+  if(tool==='color' || tool==='pdf') await window.__avNeed('UTIF');
   for(const f of files){
     const el=card(tool,f);
     try{
@@ -435,7 +617,9 @@ async function handle(files, tool){
         if(e==='tif'||e==='tiff') c=tiffToCanvas(await f.arrayBuffer());
         else c=await fileToCanvas(f);
         const svg=vectorizeCanvas(c);
-        done(el,'Black & white SVG (built-in tracer — ImageTracer is not required).',[[f.name.replace(/\.[^.]+$/,'')+'.svg', new Blob([svg],{type:'image/svg+xml'}),'Download SVG']]);
+        const mode=vecMode();
+        const note=mode==='color'?'Color poster SVG (up to 16 fills, scalable paths).': mode==='print'?'Print-detail B&W SVG (fine paths, 2400px trace).':'Sharp logo SVG (2-colour, scalable).';
+        done(el,note,[[f.name.replace(/\.[^.]+$/,'')+'.svg', new Blob([svg],{type:'image/svg+xml'}),'Download SVG']]);
         continue;
       }
       if(tool==='color'){
