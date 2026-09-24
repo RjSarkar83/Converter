@@ -3,20 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ArtViSiON | Online PDF Converter, Vectorizer &amp; RGB–CMYK — RJ Sarkar/Designer</title>
-<meta name="description" content="ArtViSiON by RJ Sarkar/Designer. Convert images and SVG to PDF, vectorize artwork, RGB to CMYK — in your browser. Files never leave your device.">
-<link rel="icon" href="static/logo.png">
+<title>ArtViSiON | PSD AI CDR EPS SVG TIFF DXF to PDF — RJ Sarkar/Designer</title>
+<meta name="description" content="ArtViSiON by RJ Sarkar/Designer. Convert PSD, AI, CDR, EPS, SVG, TIFF and DXF to PDF in the browser. Vectorize art. RGB–CMYK proof.">
+<link rel="icon" href="logo.png">
 <style>
-@font-face{font-family:'Montserrat';font-weight:400;src:url(static/fonts/Montserrat-400.woff2) format('woff2')}
-@font-face{font-family:'Montserrat';font-weight:600;src:url(static/fonts/Montserrat-600.woff2) format('woff2')}
-@font-face{font-family:'Montserrat';font-weight:700;src:url(static/fonts/Montserrat-700.woff2) format('woff2')}
-@font-face{font-family:'Montserrat';font-weight:800;src:url(static/fonts/Montserrat-800.woff2) format('woff2')}
-@font-face{font-family:'Playfair Display';font-weight:700;src:url(static/fonts/PlayfairDisplay-700.woff2) format('woff2')}
-@font-face{font-family:'Playfair Display';font-weight:800;src:url(static/fonts/PlayfairDisplay-800.woff2) format('woff2')}
-:root{--bg:#080808;--card:#121212;--line:#2a2a2a;--txt:#f4f1ea;--mut:#8a8580;--ink:#c1121f;--ink2:#8b0e18;--paper:#f4f1ea}
+@font-face{font-family:'Montserrat';font-weight:400;src:url(fonts/Montserrat-400.woff2) format('woff2'),url(static/fonts/Montserrat-400.woff2) format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:600;src:url(fonts/Montserrat-600.woff2) format('woff2'),url(static/fonts/Montserrat-600.woff2) format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:700;src:url(fonts/Montserrat-700.woff2) format('woff2'),url(static/fonts/Montserrat-700.woff2) format('woff2')}
+@font-face{font-family:'Montserrat';font-weight:800;src:url(fonts/Montserrat-800.woff2) format('woff2'),url(static/fonts/Montserrat-800.woff2) format('woff2')}
+@font-face{font-family:'Playfair Display';font-weight:700;src:url(fonts/PlayfairDisplay-700.woff2) format('woff2'),url(static/fonts/PlayfairDisplay-700.woff2) format('woff2')}
+@font-face{font-family:'Playfair Display';font-weight:800;src:url(fonts/PlayfairDisplay-800.woff2) format('woff2'),url(static/fonts/PlayfairDisplay-800.woff2) format('woff2')}
+:root{--card:#121212;--line:#2a2a2a;--txt:#f4f1ea;--mut:#8a8580;--ink:#c1121f;--paper:#f4f1ea}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(900px 420px at 8% -8%,rgba(193,18,31,.16),transparent 55%),#080808;color:var(--txt);font:15px/1.55 Montserrat,system-ui,sans-serif}
-a{color:var(--ink)}
 .wrap{max-width:1100px;margin:0 auto;padding:22px 18px 60px}
 header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--line)}
 .logo{height:36px;width:auto;filter:drop-shadow(0 2px 6px rgba(180,180,180,.45))}
@@ -46,7 +45,6 @@ h1 .on{color:var(--ink)}
 .btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .btn{padding:8px 16px;border-radius:8px;border:1px solid var(--line);background:#0c0c0c;color:var(--txt);font:700 11px Montserrat,sans-serif;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;text-decoration:none}
 .btn.p{background:var(--ink);color:#fff;border:0}
-.btn:disabled{opacity:.4;cursor:not-allowed}
 .note{color:var(--mut);font-size:12.5px;margin-top:8px}
 .err{color:#e24a4a}
 footer{margin-top:36px;padding-top:16px;border-top:1px solid var(--line);text-align:center;color:var(--mut);font-size:12px}
@@ -56,56 +54,54 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 <body>
 <div class="wrap">
 <header>
-  <img class="logo" src="static/logo.png" alt="ArtViSiON">
+  <img class="logo" src="logo.png" alt="ArtViSiON" onerror="this.onerror=null;this.src='static/logo.png'">
   <div>
     <h1>ArtViSi<span class="on">ON</span><span class="by">RJ SARKAR/DESIGNER</span></h1>
-    <p class="sub">Runs in this browser — files stay on your device</p>
+    <p class="sub">Browser studio · PSD · AI · CDR · EPS · SVG · TIFF · DXF → PDF</p>
   </div>
   <span class="okpill">Online · no upload</span>
 </header>
-
 <div class="tabs">
-  <button class="tab on" data-t="pdf">PDF Converter<small>JPG · PNG · SVG · PDF · WEBP</small></button>
+  <button class="tab on" data-t="pdf">PDF Converter<small>PSD AI CDR EPS SVG TIFF DXF</small></button>
   <button class="tab" data-t="vec">Vectorize Art<small>Photo → B&amp;W SVG</small></button>
   <button class="tab" data-t="color">Color Lab<small>RGB ⇄ CMYK proof</small></button>
 </div>
-
 <div class="pane on" id="pane-pdf">
   <div class="drop" id="drop-pdf">
-    <h2>Drop files here</h2>
-    <p>JPG, PNG, WEBP, GIF, BMP, SVG, PDF — converted in your browser to print PDF.</p>
-    <p>CDR, PSD, AI, EPS, DXF need Corel/Adobe locally (proprietary). Save those as PDF or SVG first.</p>
+    <h2>Drop design files here</h2>
+    <p>PSD, AI, CDR, EPS, SVG, TIFF, DXF, PDF, JPG, PNG — converted on this device.</p>
+    <p>DXF / SVG / PDF-AI keep vectors. PSD uses Photoshop’s merged composite. CDR uses Corel’s preview (not live Corel objects).</p>
     <button class="browse" type="button">Browse files</button>
-    <input type="file" id="file-pdf" hidden multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.svg,.pdf,.tif,.tiff">
+    <input type="file" id="file-pdf" hidden multiple accept=".psd,.psb,.ai,.cdr,.eps,.svg,.tif,.tiff,.dxf,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp">
   </div>
   <div class="queue" id="q-pdf"></div>
 </div>
-
 <div class="pane" id="pane-vec">
   <div class="drop" id="drop-vec">
     <h2>Drop photos or logos</h2>
-    <p>JPG / PNG → clean black-and-white SVG vector (ImageTracer, in-browser).</p>
+    <p>Built-in black-and-white SVG tracer (no extra engine).</p>
     <button class="browse" type="button">Browse images</button>
-    <input type="file" id="file-vec" hidden multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp">
+    <input type="file" id="file-vec" hidden multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff">
   </div>
   <div class="queue" id="q-vec"></div>
 </div>
-
 <div class="pane" id="pane-color">
   <div class="drop" id="drop-color">
     <h2>Drop images</h2>
-    <p>RGB → CMYK proof JPEG (SWOP-style mix). Preview stays on this device.</p>
+    <p>RGB → CMYK proof JPEG.</p>
     <button class="browse" type="button">Browse images</button>
-    <input type="file" id="file-color" hidden multiple accept=".jpg,.jpeg,.png,.webp,.bmp">
+    <input type="file" id="file-color" hidden multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff">
   </div>
   <div class="queue" id="q-color"></div>
 </div>
-
-<footer>© 2026 <b>ArtViSiON</b> by RJ Sarkar/Designer · GitHub Pages studio</footer>
+<footer>© 2026 <b>ArtViSiON</b> by RJ Sarkar/Designer</footer>
 </div>
 <script src="vendor/pdf-lib.min.js"></script>
-<script src="vendor/imagetracer.min.js"></script>
+<script src="docs/vendor/pdf-lib.min.js"></script>
+<script src="vendor/utif.min.js"></script>
+<script src="docs/vendor/utif.min.js"></script>
 <script>
+(function(){
 const $=s=>document.querySelector(s);
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
@@ -113,8 +109,8 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 });
 function wire(id, tool){
   const drop=$('#drop-'+id), fi=$('#file-'+id);
-  drop.onclick=e=>{if(e.target.tagName!=='BUTTON')fi.click()};
-  drop.querySelector('.browse').onclick=()=>fi.click();
+  drop.onclick=e=>{if(e.target.tagName!=='BUTTON') fi.click()};
+  drop.querySelector('.browse').onclick=e=>{e.stopPropagation();fi.click()};
   fi.onchange=()=>{handle([...fi.files],tool);fi.value=''};
   ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
@@ -122,20 +118,15 @@ function wire(id, tool){
 }
 wire('pdf','pdf'); wire('vec','vec'); wire('color','color');
 
-const BLOCK=/\.(cdr|psd|psb|ai|eps|dxf|dwg)$/i;
-function ext(n){return (n.split('.').pop()||'').toLowerCase()}
-function kb(n){return (n/1024).toFixed(1)+' KB'}
+const ext=n=>(n.split('.').pop()||'').toLowerCase();
+const kb=n=>(n/1024).toFixed(1)+' KB';
 function card(tool,f){
   const el=document.createElement('div'); el.className='card';
-  el.innerHTML=`<div class="chead"><span class="badge">${ext(f.name).toUpperCase()}</span>
-    <span class="fname"></span><span class="fsize">${kb(f.size)}</span>
-    <span class="status">working…</span></div>
-    <div class="note"></div><div class="btns"></div>`;
+  el.innerHTML=`<div class="chead"><span class="badge">${ext(f.name).toUpperCase()}</span><span class="fname"></span><span class="fsize">${kb(f.size)}</span><span class="status">working…</span></div><div class="note"></div><div class="btns"></div>`;
   el.querySelector('.fname').textContent=f.name;
-  $('#q-'+tool).prepend(el);
-  return el;
+  $('#q-'+tool).prepend(el); return el;
 }
-function done(el, msg, blobs){
+function done(el,msg,blobs){
   el.querySelector('.status').textContent='done';
   el.querySelector('.note').textContent=msg;
   const box=el.querySelector('.btns');
@@ -146,99 +137,361 @@ function done(el, msg, blobs){
 }
 function fail(el,msg){el.querySelector('.status').innerHTML='<span class="err">failed</span>';el.querySelector('.note').innerHTML='<span class="err">'+msg+'</span>';}
 
-async function fileToImage(f){
-  const url=URL.createObjectURL(f);
-  const img=new Image(); img.crossOrigin='anonymous';
-  await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('Could not read image'));img.src=url});
-  const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
-  c.getContext('2d').drawImage(img,0,0);
-  URL.revokeObjectURL(url);
-  return c;
-}
-async function canvasPng(c){
-  return await new Promise(r=>c.toBlob(r,'image/png'));
-}
-async function toPdfFromImages(canvases, name){
-  const {PDFDocument}=PDFLib;
-  const pdf=await PDFDocument.create();
-  for(const c of canvases){
-    const blob=await canvasPng(c);
-    const bytes=new Uint8Array(await blob.arrayBuffer());
-    const img=await pdf.embedPng(bytes);
-    const w=img.width, h=img.height;
-    const maxW=595, maxH=842;
-    const s=Math.min(maxW/w, maxH/h, 1);
-    const pw=w*s, ph=h*s;
-    const page=pdf.addPage([pw,ph]);
-    page.drawImage(img,{x:0,y:0,width:pw,height:ph});
-  }
-  const bytes=await pdf.save();
-  return new Blob([bytes],{type:'application/pdf'});
+const u8=b=>b instanceof Uint8Array?b:new Uint8Array(b);
+function ascii(b,i,n){let s='';const a=u8(b);for(let k=0;k<n&&i+k<a.length;k++) s+=String.fromCharCode(a[i+k]); return s}
+function le16(a,i){return a[i]|a[i+1]<<8}
+function le32(a,i){return (a[i]|a[i+1]<<8|a[i+2]<<16|a[i+3]<<24)>>>0}
+function be16(a,i){return (a[i]<<8)|a[i+1]}
+function be32(a,i){return ((a[i]<<24)|(a[i+1]<<16)|(a[i+2]<<8)|a[i+3])>>>0}
+
+function pdfLib(){
+  const P=window.PDFLib;
+  if(!P||!P.PDFDocument) throw new Error('PDF library not loaded. Upload vendor/pdf-lib.min.js next to this page, then refresh.');
+  return P;
 }
 
-function rgbToCmykCanvas(c){
-  const ctx=c.getContext('2d');
-  const d=ctx.getImageData(0,0,c.width,c.height);
-  const p=d.data;
-  for(let i=0;i<p.length;i+=4){
-    const r=p[i]/255,g=p[i+1]/255,b=p[i+2]/255;
-    const k=1-Math.max(r,g,b);
-    let C=0,M=0,Y=0;
-    if(k<1){C=(1-r-k)/(1-k);M=(1-g-k)/(1-k);Y=(1-b-k)/(1-k)}
-    // SWOP-ish proof: reconstruct RGB from CMYK for preview
-    const R=255*(1-C)*(1-k), G=255*(1-M)*(1-k), B=255*(1-Y)*(1-k);
-    p[i]=R; p[i+1]=G; p[i+2]=B;
+async function canvasPng(c){return await new Promise((r,j)=>c.toBlob(b=>b?r(b):j(new Error('png')),'image/png'))}
+async function blobToCanvas(blob){
+  const url=URL.createObjectURL(blob);
+  try{
+    const img=new Image();
+    await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('Could not decode image'));img.src=url});
+    const c=document.createElement('canvas');
+    c.width=img.naturalWidth||img.width; c.height=img.naturalHeight||img.height;
+    if(!c.width) throw new Error('Empty image');
+    c.getContext('2d').drawImage(img,0,0); return c;
+  }finally{URL.revokeObjectURL(url)}
+}
+async function fileToCanvas(f){return blobToCanvas(f)}
+
+async function toPdfFromCanvases(canvases){
+  const {PDFDocument}=pdfLib();
+  const pdf=await PDFDocument.create();
+  pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
+  for(const c of canvases){
+    const blob=await canvasPng(c);
+    const img=await pdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
+    const s=Math.min(595/img.width, 842/img.height, 1);
+    const page=pdf.addPage([img.width*s, img.height*s]);
+    page.drawImage(img,{x:0,y:0,width:img.width*s,height:img.height*s});
   }
-  ctx.putImageData(d,0,0);
+  return new Blob([await pdf.save()],{type:'application/pdf'});
+}
+
+async function inflateRaw(bytes){
+  const ds=new DecompressionStream('deflate-raw');
+  const w=ds.writable.getWriter(); w.write(bytes); await w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+async function unzipEntries(buf){
+  const a=u8(buf); if(a[0]!==0x50||a[1]!==0x4b) return [];
+  const out=[]; let i=0;
+  while(i+30<a.length && a[i]===0x50&&a[i+1]===0x4b&&a[i+2]===3&&a[i+3]===4){
+    const method=le16(a,i+8), comp=le32(a,i+18), nlen=le16(a,i+26), elen=le16(a,i+28);
+    const name=new TextDecoder().decode(a.subarray(i+30,i+30+nlen));
+    const start=i+30+nlen+elen; const slice=a.subarray(start,start+comp);
+    let data=null;
+    try{ data = method===0?slice: method===8?await inflateRaw(slice):null }catch(e){}
+    if(data) out.push({name,data});
+    i=start+comp;
+  }
+  return out;
+}
+function findImageBlobs(bytes){
+  const a=u8(bytes), blobs=[];
+  const push=(s,e,t,ext)=>{if(e>s+32) blobs.push({ext,type:t,bytes:a.slice(s,e)})};
+  for(let i=0;i<a.length-8;i++){
+    if(a[i]===0x89&&a[i+1]===0x50&&a[i+2]===0x4e&&a[i+3]===0x47){
+      let end=i+8;
+      while(end+12<a.length){
+        const len=(a[end]<<24)|(a[end+1]<<16)|(a[end+2]<<8)|a[end+3];
+        const typ=ascii(a,end+4,4); end+=12+len;
+        if(typ==='IEND'){push(i,end,'image/png','png');break}
+        if(len>5e7) break;
+      }
+    }
+    if(a[i]===0xff&&a[i+1]===0xd8&&a[i+2]===0xff){
+      for(let j=i+2;j<a.length-1;j++) if(a[j]===0xff&&a[j+1]===0xd9){push(i,j+2,'image/jpeg','jpg');break}
+    }
+    if(a[i]===0x42&&a[i+1]===0x4d){
+      const sz=le32(a,i+2);
+      if(sz>54&&sz<4e7&&i+sz<=a.length+16) push(i,Math.min(i+sz,a.length),'image/bmp','bmp');
+    }
+  }
+  blobs.sort((x,y)=>y.bytes.length-x.bytes.length); return blobs;
+}
+
+/* Photoshop flattened composite (visual match of merged layers) */
+function packbits(src, o, n){
+  const out=new Uint8Array(n); let i=0, p=o;
+  while(i<n){
+    const h=src[p++]<<24>>24;
+    if(h>=0){ const c=h+1; out.set(src.subarray(p,p+c),i); p+=c; i+=c; }
+    else if(h!==-128){ const c=1-h; out.fill(src[p++], i, i+c); i+=c; }
+  }
+  return {data:out, next:p};
+}
+function psdToCanvas(buf){
+  const a=u8(buf);
+  if(ascii(a,0,4)!=='8BPS') throw new Error('Not a Photoshop PSD');
+  const ch=be16(a,12), h=be32(a,14), w=be32(a,18), depth=be16(a,22);
+  if(w>8000||h>8000) throw new Error('PSD too large for browser ('+w+'×'+h+')');
+  let o=26;
+  o+=4+be32(a,o);
+  o+=4+be32(a,o);
+  o+=4+be32(a,o);
+  const comp=be16(a,o); o+=2;
+  const n=w*h;
+  const planes=[];
+  if(comp===0){
+    const bpp=depth===16?2:1;
+    for(let c=0;c<ch;c++){
+      const sl=a.subarray(o,o+n*bpp); o+=n*bpp;
+      const p=new Uint8Array(n);
+      if(bpp===1) p.set(sl); else for(let i=0;i<n;i++) p[i]=sl[i*2];
+      planes.push(p);
+    }
+  } else if(comp===1){
+    const rowBytes=new Array(ch*h);
+    for(let i=0;i<ch*h;i++){ rowBytes[i]=be16(a,o); o+=2; }
+    for(let c=0;c<ch;c++){
+      const p=new Uint8Array(n);
+      for(let y=0;y<h;y++){
+        const {data}=packbits(a,o,w);
+        p.set(data,y*w); o+=rowBytes[c*h+y];
+      }
+      planes.push(p);
+    }
+  } else throw new Error('PSD compression '+comp+' not supported');
+  const cnv=document.createElement('canvas'); cnv.width=w; cnv.height=h;
+  const img=cnv.getContext('2d').createImageData(w,h);
+  const d=img.data;
+  for(let i=0;i<n;i++){
+    if(ch>=3){ d[i*4]=planes[0][i]; d[i*4+1]=planes[1][i]; d[i*4+2]=planes[2][i]; d[i*4+3]=ch>=4?planes[3][i]:255; }
+    else { const v=planes[0][i]; d[i*4]=d[i*4+1]=d[i*4+2]=v; d[i*4+3]=ch>=2?planes[1][i]:255; }
+  }
+  cnv.getContext('2d').putImageData(img,0,0);
+  return cnv;
+}
+
+function tiffToCanvas(buf){
+  const U=window.UTIF;
+  if(!U){
+    const imgs=findImageBlobs(buf);
+    if(!imgs.length) throw new Error('TIFF decoder missing and no embedded JPEG.');
+    throw new Error('TIFF needs vendor/utif.min.js');
+  }
+  const ifds=U.decode(u8(buf).buffer);
+  if(!ifds||!ifds.length) throw new Error('Empty TIFF');
+  U.decodeImage(buf, ifds[0]);
+  const rgba=U.toRGBA8(ifds[0]);
+  const w=ifds[0].width, h=ifds[0].height;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const id=c.getContext('2d').createImageData(w,h);
+  id.data.set(rgba); c.getContext('2d').putImageData(id,0,0);
   return c;
+}
+
+async function previewFromBinary(buf){
+  const a=u8(buf);
+  if(ascii(a,0,5)==='%PDF-') return {pdf:new Blob([a],{type:'application/pdf'})};
+  if(a[0]===0x50&&a[1]===0x4b){
+    const ents=await unzipEntries(a);
+    const prefer=ents.filter(e=>/thumb|preview|\.png|\.jpg|\.jpeg|\.bmp/i.test(e.name));
+    for(const e of prefer.concat(ents)){
+      const imgs=findImageBlobs(e.data);
+      if(imgs[0]){ try{return {canvas:await blobToCanvas(new Blob([imgs[0].bytes],{type:imgs[0].type}))} }catch(x){} }
+    }
+  }
+  const imgs=findImageBlobs(a);
+  for(const im of imgs){
+    try{return {canvas:await blobToCanvas(new Blob([im.bytes],{type:im.type}))} }catch(x){}
+  }
+  throw new Error('No preview or PDF stream inside this file.');
+}
+
+/* ASCII DXF → vector PDF (LINE, LWPOLYLINE, POLYLINE, CIRCLE, ARC, TEXT) */
+function parseDxf(text){
+  const raw=text.split(/\r?\n/);
+  const pairs=[];
+  for(let i=0;i+1<raw.length;i+=2){
+    const code=parseInt(raw[i].trim(),10);
+    if(Number.isNaN(code)) {i--; continue;}
+    pairs.push([code, raw[i+1]]);
+  }
+  const ents=[]; let cur=null; let inEnt=false;
+  for(const [code,val] of pairs){
+    if(code===0){
+      const t=val.trim();
+      if(t==='SECTION'||t==='ENDSEC'||t==='EOF'||t==='TABLE'||t==='ENDTAB'){ cur=null; inEnt=false; continue; }
+      cur={type:t, pts:[], bulge:[]}; ents.push(cur); inEnt=true; continue;
+    }
+    if(!cur) continue;
+    const n=parseFloat(val);
+    if(code===8) cur.layer=val.trim();
+    else if(code===1||code===7) cur.text=(cur.text||'')+val;
+    else if(code===10) cur.x=n;
+    else if(code===20){ cur.y=n; if(cur.type==='LWPOLYLINE'||cur.type==='VERTEX'){ cur.pts.push([cur.x,cur.y]); } }
+    else if(code===11) cur.x2=n;
+    else if(code===21) cur.y2=n;
+    else if(code===40) cur.r=n;
+    else if(code===50) cur.a0=n;
+    else if(code===51) cur.a1=n;
+    else if(code===70) cur.flags=parseInt(val,10);
+  }
+  return ents;
+}
+async function dxfToPdf(text){
+  const {PDFDocument, rgb}=pdfLib();
+  const ents=parseDxf(text);
+  const draw=[];
+  ents.forEach(e=>{
+    if(e.type==='LINE' && e.x!=null && e.x2!=null) draw.push({k:'L',x1:e.x,y1:e.y,x2:e.x2,y2:e.y2,layer:e.layer});
+    if((e.type==='LWPOLYLINE'||e.type==='POLYLINE') && e.pts.length){
+      for(let i=1;i<e.pts.length;i++) draw.push({k:'L',x1:e.pts[i-1][0],y1:e.pts[i-1][1],x2:e.pts[i][0],y2:e.pts[i][1],layer:e.layer});
+      if(e.flags&1 && e.pts.length>2) draw.push({k:'L',x1:e.pts[e.pts.length-1][0],y1:e.pts[e.pts.length-1][1],x2:e.pts[0][0],y2:e.pts[0][1],layer:e.layer});
+    }
+    if(e.type==='CIRCLE' && e.r) draw.push({k:'C',x:e.x,y:e.y,r:e.r,layer:e.layer});
+    if(e.type==='ARC' && e.r!=null) draw.push({k:'A',x:e.x,y:e.y,r:e.r,a0:e.a0||0,a1:e.a1||360,layer:e.layer});
+    if(e.type==='TEXT' && e.text) draw.push({k:'T',x:e.x,y:e.y,t:e.text,h:e.r||10,layer:e.layer});
+  });
+  if(!draw.length) throw new Error('No drawable DXF entities (need ASCII DXF with LINE/POLYLINE/CIRCLE/TEXT).');
+  let minX=1e15,minY=1e15,maxX=-1e15,maxY=-1e15;
+  const touch=(x,y)=>{minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y)};
+  draw.forEach(d=>{
+    if(d.k==='L'){touch(d.x1,d.y1);touch(d.x2,d.y2)}
+    if(d.k==='C'||d.k==='A'){touch(d.x-d.r,d.y-d.r);touch(d.x+d.r,d.y+d.r)}
+    if(d.k==='T') touch(d.x,d.y);
+  });
+  const pad=20, W=maxX-minX||1, H=maxY-minY||1;
+  const scale=Math.min(760/W, 520/H, 4);
+  const pw=W*scale+pad*2, ph=H*scale+pad*2;
+  const pdf=await PDFDocument.create();
+  pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
+  const page=pdf.addPage([pw,ph]);
+  const map=(x,y)=>({x:(x-minX)*scale+pad, y:(y-minY)*scale+pad});
+  const ink=rgb(0.05,0.05,0.05);
+  for(const d of draw){
+    if(d.k==='L'){
+      const a=map(d.x1,d.y1), b=map(d.x2,d.y2);
+      page.drawLine({start:a,end:b,thickness:0.6,color:ink});
+    } else if(d.k==='C'){
+      const p=map(d.x,d.y);
+      page.drawCircle({x:p.x,y:p.y,size:d.r*scale,borderColor:ink,borderWidth:0.6,color:undefined});
+    } else if(d.k==='A'){
+      const steps=32; const a0=d.a0*Math.PI/180, a1=d.a1*Math.PI/180;
+      let last=null;
+      for(let i=0;i<=steps;i++){
+        const t=a0+(a1-a0)*i/steps;
+        const p=map(d.x+d.r*Math.cos(t), d.y+d.r*Math.sin(t));
+        if(last) page.drawLine({start:last,end:p,thickness:0.6,color:ink});
+        last=p;
+      }
+    } else if(d.k==='T'){
+      const p=map(d.x,d.y);
+      page.drawText(String(d.t).slice(0,200),{x:p.x,y:p.y,size:Math.max(6, (d.h||10)*scale*0.8),color:ink});
+    }
+  }
+  return new Blob([await pdf.save()],{type:'application/pdf'});
+}
+
+function vectorizeCanvas(src){
+  const max=800, s=Math.min(1, max/Math.max(src.width,src.height));
+  const w=Math.max(1,Math.round(src.width*s)), h=Math.max(1,Math.round(src.height*s));
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(src,0,0,w,h);
+  const id=g.getImageData(0,0,w,h), p=id.data;
+  const bin=new Uint8Array(w*h); let sum=0;
+  for(let i=0,j=0;i<p.length;i+=4,j++){ const y=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; sum+=y; bin[j]=y; }
+  const thr=sum/(w*h)*0.82;
+  for(let j=0;j<bin.length;j++) bin[j]=bin[j]<thr?1:0;
+  let d=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="#111">`;
+  for(let y=0;y<h;y++){
+    let x=0; while(x<w){
+      if(!bin[y*w+x]){x++;continue}
+      let x2=x; while(x2<w && bin[y*w+x2]) x2++;
+      d+=`<rect x="${x}" y="${y}" width="${x2-x}" height="1"/>`; x=x2;
+    }
+  }
+  return d+'</svg>';
+}
+function rgbToCmykCanvas(c){
+  const ctx=c.getContext('2d'), d=ctx.getImageData(0,0,c.width,c.height), p=d.data;
+  for(let i=0;i<p.length;i+=4){
+    const r=p[i]/255,g=p[i+1]/255,b=p[i+2]/255, k=1-Math.max(r,g,b);
+    let C=0,M=0,Y=0; if(k<1){C=(1-r-k)/(1-k);M=(1-g-k)/(1-k);Y=(1-b-k)/(1-k)}
+    p[i]=255*(1-C)*(1-k); p[i+1]=255*(1-M)*(1-k); p[i+2]=255*(1-Y)*(1-k);
+  }
+  ctx.putImageData(d,0,0); return c;
 }
 
 async function handle(files, tool){
   for(const f of files){
     const el=card(tool,f);
     try{
-      if(BLOCK.test(f.name)){
-        fail(el,'Proprietary format. On GitHub Pages convert JPG/PNG/SVG/PDF in the browser. For CDR/PSD/AI export PDF or SVG from Corel/Adobe first.');
+      const e=ext(f.name);
+      if(tool==='vec'){
+        let c;
+        if(e==='tif'||e==='tiff') c=tiffToCanvas(await f.arrayBuffer());
+        else c=await fileToCanvas(f);
+        const svg=vectorizeCanvas(c);
+        done(el,'Black & white SVG (built-in tracer — ImageTracer is not required).',[[f.name.replace(/\.[^.]+$/,'')+'.svg', new Blob([svg],{type:'image/svg+xml'}),'Download SVG']]);
         continue;
       }
-      if(tool==='pdf'){
-        const e=ext(f.name);
-        if(e==='pdf'){
-          done(el,'Already PDF — download original.',[[f.name.replace(/\.pdf$/i,'')+'.pdf',f,'Download PDF']]);
-          continue;
-        }
-        if(e==='svg'){
-          const t=await f.text();
-          const blob=new Blob([t],{type:'image/svg+xml'});
-          const imgF=new File([blob],'x.svg',{type:'image/svg+xml'});
-          const c=await fileToImage(imgF);
-          const pdf=await toPdfFromImages([c], f.name);
-          done(el,'SVG rasterized into a one-page PDF (print size fit to A4).',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-          continue;
-        }
-        const c=await fileToImage(f);
-        const pdf=await toPdfFromImages([c], f.name);
-        done(el,'Image placed on a PDF page. Vectors in photos stay pixels — that is correct.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
-      } else if(tool==='vec'){
-        if(typeof ImageTracer==='undefined'){fail(el,'Vector engine failed to load.');continue}
-        const c=await fileToImage(f);
-        // downscale for speed
-        const max=900, s=Math.min(1, max/Math.max(c.width,c.height));
-        const c2=document.createElement('canvas');
-        c2.width=Math.max(1,Math.round(c.width*s)); c2.height=Math.max(1,Math.round(c.height*s));
-        const g=c2.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c2.width,c2.height); g.drawImage(c,0,0,c2.width,c2.height);
-        const svg=ImageTracer.imagedataToSVG(g.getImageData(0,0,c2.width,c2.height),{numberofcolors:2,pathomit:8,ltres:1,qtres:1});
-        const blob=new Blob([svg],{type:'image/svg+xml'});
-        done(el,'Black & white vector SVG (in-browser ImageTracer).',[[f.name.replace(/\.[^.]+$/,'')+'.svg',blob,'Download SVG']]);
-      } else {
-        const c=await fileToImage(f);
+      if(tool==='color'){
+        let c;
+        if(e==='tif'||e==='tiff') c=tiffToCanvas(await f.arrayBuffer());
+        else c=await fileToCanvas(f);
         rgbToCmykCanvas(c);
         const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.92));
-        done(el,'CMYK proof JPEG (subtractive mix). Not an ICC press file — good for on-screen check.',[[f.name.replace(/\.[^.]+$/,'')+'_cmyk.jpg',blob,'Download proof']]);
+        done(el,'CMYK proof JPEG.',[[f.name.replace(/\.[^.]+$/,'')+'_cmyk.jpg',blob,'Download proof']]);
+        continue;
       }
-    }catch(err){fail(el, err.message||String(err))}
+      /* PDF tab */
+      if(e==='pdf'){ done(el,'Already PDF.',[[f.name,f,'Download PDF']]); continue; }
+      if(e==='dxf'){
+        const t=await f.text();
+        const pdf=await dxfToPdf(t);
+        done(el,'DXF vectors drawn as PDF lines/circles/text (ASCII DXF). Layers drawn; not AutoCAD OCG.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+        continue;
+      }
+      if(e==='svg'){
+        const t=await f.text();
+        const c=await blobToCanvas(new Blob([t],{type:'image/svg+xml'}));
+        const pdf=await toPdfFromCanvases([c]);
+        done(el,'SVG rendered to a PDF page (browser SVG engine).',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+        continue;
+      }
+      if(e==='psd'||e==='psb'){
+        const c=psdToCanvas(await f.arrayBuffer());
+        const pdf=await toPdfFromCanvases([c]);
+        done(el,'PSD merged composite (all visible layers as Photoshop flattened them). Blend-as-seen, not live Type layers.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+        continue;
+      }
+      if(e==='tif'||e==='tiff'){
+        const c=tiffToCanvas(await f.arrayBuffer());
+        const pdf=await toPdfFromCanvases([c]);
+        done(el,'TIFF page 1 → PDF.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+        continue;
+      }
+      if(e==='ai'||e==='eps'||e==='cdr'){
+        const buf=await f.arrayBuffer();
+        const got=await previewFromBinary(buf);
+        if(got.pdf){ done(el, e==='ai'?'PDF-compatible Illustrator file (vectors kept).':'Embedded PDF stream.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',got.pdf,'Download PDF']]); continue; }
+        const pdf=await toPdfFromCanvases([got.canvas]);
+        done(el, e==='cdr'
+          ? 'CDR preview bitmap → PDF. Live Corel objects/text need CorelDRAW Export PDF.'
+          : 'Embedded preview → PDF. For vectors, save PDF from Illustrator.',
+          [[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+        continue;
+      }
+      const c=await fileToCanvas(f);
+      const pdf=await toPdfFromCanvases([c]);
+      done(el,'Image → PDF page.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+    }catch(err){ fail(el, err.message||String(err)); }
   }
 }
+})();
 </script>
 </body>
 </html>
