@@ -80,7 +80,7 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
       <label><input type="radio" name="pdfq" value="150"> Screen 150 DPI</label>
     </div>
     <button class="browse" type="button">Browse files</button>
-    <input type="file" id="file-pdf" hidden multiple accept=".psd,.psb,.ai,.cdr,.eps,.svg,.tif,.tiff,.dxf,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp">
+    <input type="file" id="file-pdf" hidden multiple accept=".psd,.psb,.ai,.cdr,.eps,.svg,.tif,.tiff,.dxf,.pdf,.jpg,.jpeg,.png,.webp,.gif,.bmp,image/*">
   </div>
   <div class="queue" id="q-pdf"></div>
 </div>
@@ -94,7 +94,7 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
       <label><input type="radio" name="vecq" value="color"> Color poster</label>
     </div>
     <button class="browse" type="button">Browse images</button>
-    <input type="file" id="file-vec" hidden multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tif,.tiff">
+    <input type="file" id="file-vec" hidden multiple accept="image/*">
   </div>
   <div class="queue" id="q-vec"></div>
 </div>
@@ -103,7 +103,7 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
     <h2>Drop images</h2>
     <p>RGB → CMYK proof JPEG.</p>
     <button class="browse" type="button">Browse images</button>
-    <input type="file" id="file-color" hidden multiple accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff">
+    <input type="file" id="file-color" hidden multiple accept="image/*">
   </div>
   <div class="queue" id="q-color"></div>
 </div>
@@ -112,28 +112,19 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 <script>
 (function(){
 function addScript(src){
-  return new Promise((res,rej)=>{
+  return new Promise(res=>{
     const s=document.createElement('script');
-    s.src=src; s.async=true;
-    s.onload=()=>res(true);
-    s.onerror=()=>res(false);
+    s.src=src;
+    const t=setTimeout(()=>res(false),4000);
+    s.onload=()=>{clearTimeout(t);res(true)};
+    s.onerror=()=>{clearTimeout(t);res(false)};
     document.head.appendChild(s);
   });
 }
 const LIBS={
-  PDFLib:[
-    'docs/vendor/pdf-lib.min.js','vendor/pdf-lib.min.js',
-    'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
-    'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'
-  ],
-  ImageTracer:[
-    'docs/vendor/imagetracer.min.js','vendor/imagetracer.min.js',
-    'https://cdn.jsdelivr.net/gh/jankovicsandras/imagetracerjs@1.2.6/imagetracer_v1.2.6.min.js'
-  ],
-  UTIF:[
-    'docs/vendor/utif.min.js','vendor/utif.min.js',
-    'https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js'
-  ]
+  PDFLib:['docs/vendor/pdf-lib.min.js','vendor/pdf-lib.min.js'],
+  ImageTracer:['docs/vendor/imagetracer.min.js','vendor/imagetracer.min.js'],
+  UTIF:['docs/vendor/utif.min.js','vendor/utif.min.js']
 };
 async function need(flag){
   if(window[flag]) return true;
@@ -605,9 +596,7 @@ function rgbToCmykCanvas(c){
 }
 
 async function handle(files, tool){
-  if(tool==='pdf') await window.__avNeed('PDFLib');
-  if(tool==='vec') await window.__avNeed('ImageTracer');
-  if(tool==='color' || tool==='pdf') await window.__avNeed('UTIF');
+  if(!files || !files.length) return;
   for(const f of files){
     const el=card(tool,f);
     try{
@@ -677,5 +666,5 @@ async function handle(files, tool){
 }
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a40397b94a6694dd',t:'MTc5MDI3MTgxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
