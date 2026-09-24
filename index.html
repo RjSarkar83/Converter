@@ -101,7 +101,7 @@ footer b{font-family:"Playfair Display",Georgia,serif;color:var(--paper);font-si
 <div class="pane" id="pane-vec">
   <div class="drop" id="drop-vec">
     <h2>Drop photos or logos</h2>
-    <p>Smooth colour-art SVG: few clean fills, curved paths. HQ = more colours and finer detail.</p>
+    <p>Professional colour SVG: true hues kept, smooth borders. Color art = clean limited palette. HQ = more tones.</p>
     <div class="qbar">
       <label><input type="radio" name="vecq" value="art" checked> Color art</label>
       <label><input type="radio" name="vecq" value="hq"> HQ colour</label>
@@ -598,20 +598,22 @@ function kmeansPalette(id, k){
   return pal.map(c=>({r:Math.round(c[0]),g:Math.round(c[1]),b:Math.round(c[2]),a:255}));
 }
 function applyPalette(id, pal){
-  const p=id.data;
-  for(let i=0;i<p.length;i+=4){
-    let bi=0,bd=1e12;
-    for(let j=0;j<pal.length;j++){
-      const d=(p[i]-pal[j].r)**2+(p[i+1]-pal[j].g)**2+(p[i+2]-pal[j].b)**2;
-      if(d<bd){bd=d;bi=j}
+  const p=id.data, idx=new Uint16Array(p.length/4);
+  for(let i=0,j=0;i<p.length;i+=4,j++){
+    let bi=0,bd=1e15;
+    for(let t=0;t<pal.length;t++){
+      const d=colorDist(p[i],p[i+1],p[i+2], pal[t].r,pal[t].g,pal[t].b);
+      if(d<bd){bd=d;bi=t}
     }
+    idx[j]=bi;
     p[i]=pal[bi].r; p[i+1]=pal[bi].g; p[i+2]=pal[bi].b; p[i+3]=255;
   }
+  id._idx=idx;
   return id;
 }
 function prepTraceCanvas(src){
   const mode=vecMode();
-  const max=mode==='print'?2400: mode==='hq'?2200: mode==='art'?1600: 2000;
+  const max=mode==='print'?2400: mode==='hq'?2000: mode==='art'?1400: 1800;
   const s=Math.min(1, max/Math.max(src.width,src.height));
   const w=Math.max(1,Math.round(src.width*s)), h=Math.max(1,Math.round(src.height*s));
   const c=document.createElement('canvas'); c.width=w; c.height=h;
@@ -620,11 +622,11 @@ function prepTraceCanvas(src){
   g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(src,0,0,w,h);
   let id=g.getImageData(0,0,w,h);
   if(mode==='art'||mode==='hq'){
-    boxBlur(id, mode==='art'?2:1);
-    const k=mode==='art'?8:16;
-    const pal=kmeansPalette(id,k);
+    boxBlur(id, 1);
+    const k=mode==='art'?14:28;
+    const pal=medianCutPalette(id,k);
     applyPalette(id, pal);
-    c._pal=pal;
+    c._pal=pal; c._idx=id._idx;
   } else {
     contrastStretch(id);
   }
@@ -644,7 +646,7 @@ function rdp(pts, eps){
   const L=rdp(pts.slice(0,idx+1),eps), R=rdp(pts.slice(idx),eps);
   return L.slice(0,-1).concat(R);
 }
-function pathContours(bin,w,h){
+function pathContours(bin,w,h,eps){
   const vis=new Uint8Array(w*h);
   const dirs=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
   const on=(x,y)=>x>=0&&y>=0&&x<w&&y<h&&bin[y*w+x];
@@ -663,9 +665,50 @@ function pathContours(bin,w,h){
       }
       if(!found) break;
     } while((cx!==x||cy!==y) && ++guard<w*h);
-    if(pts.length>8) loops.push(rdp(pts, vecMode()==='print'?0.7:1.05));
+    if(pts.length>10) loops.push(rdp(pts, eps==null?(vecMode()==='print'?0.7:1.0):eps));
   }
   return loops;
+}
+function chaikin(pts, it){
+  let a=pts;
+  for(let n=0;n<it;n++){
+    if(a.length<4) break;
+    const o=[];
+    for(let i=0;i<a.length;i++){
+      const p=a[i], q=a[(i+1)%a.length];
+      o.push([0.75*p[0]+0.25*q[0], 0.75*p[1]+0.25*q[1]]);
+      o.push([0.25*p[0]+0.75*q[0], 0.25*p[1]+0.75*q[1]]);
+    }
+    a=o;
+  }
+  return a;
+}
+function pathD(loop){
+  const s=loop.map(p=>[Math.round(p[0]*10)/10, Math.round(p[1]*10)/10]);
+  let d=`M ${s[0][0]} ${s[0][1]}`;
+  for(let i=1;i<s.length;i++) d+=` L ${s[i][0]} ${s[i][1]}`;
+  return d+' Z';
+}
+function colorArtSVG(c){
+  const pal=c._pal, idx=c._idx, w=c.width, h=c.height;
+  const counts=new Array(pal.length).fill(0);
+  for(let i=0;i<idx.length;i++) counts[idx[i]]++;
+  const order=pal.map((_,i)=>i).sort((a,b)=>counts[b]-counts[a]);
+  const minArea=Math.max(12, Math.round(w*h*0.00025));
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" fill-rule="evenodd">`;
+  for(const ci of order){
+    if(counts[ci]<minArea) continue;
+    const bin=new Uint8Array(w*h);
+    for(let i=0;i<idx.length;i++) if(idx[i]===ci) bin[i]=1;
+    const loops=pathContours(bin,w,h, 0.85);
+    const col=`rgb(${pal[ci].r},${pal[ci].g},${pal[ci].b})`;
+    for(const loop of loops){
+      if(loop.length<4) continue;
+      const sm=chaikin(loop, 2);
+      svg+=`<path fill="${col}" stroke="${col}" stroke-width="0.55" stroke-linejoin="round" d="${pathD(sm)}"/>`;
+    }
+  }
+  return svg+'</svg>';
 }
 function vectorizeCanvas(src){
   const c=prepTraceCanvas(src);
@@ -673,15 +716,10 @@ function vectorizeCanvas(src){
   const id=g.getImageData(0,0,c.width,c.height);
   const T=window.ImageTracer;
   const mode=vecMode();
-  const opt= mode==='art' ? {
-    numberofcolors:8, colorsampling:0, pal:c._pal, pathomit:10, ltres:1.2, qtres:1.2,
-    rightangleenhance:false, strokewidth:0, linefilter:true, viewbox:true,
-    roundcoords:2, scale:1, blurradius:0, colorquantcycles:3, mincolorratio:0.012
-  } : mode==='hq' ? {
-    numberofcolors:16, colorsampling:0, pal:c._pal, pathomit:3, ltres:0.45, qtres:0.45,
-    rightangleenhance:false, strokewidth:0, linefilter:false, viewbox:true,
-    roundcoords:2, scale:1, blurradius:0, colorquantcycles:4, mincolorratio:0.004
-  } : mode==='print' ? {
+  if(mode==='art'||mode==='hq'){
+    return colorArtSVG(c);
+  }
+  const opt= mode==='print' ? {
     numberofcolors:2, colorsampling:0, pathomit:1, ltres:0.35, qtres:0.35,
     rightangleenhance:true, strokewidth:0, linefilter:false, viewbox:true,
     roundcoords:2, scale:1, blurradius:0, colorquantcycles:4
@@ -818,7 +856,7 @@ async function handle(files, tool){
         c=await anyFileToCanvas(f);
         const svg=vectorizeCanvas(c);
         const mode=vecMode();
-        const note=mode==='color'?'Color poster SVG (up to 16 fills, scalable paths).': mode==='print'?'Print-detail B&W SVG (fine paths, 2400px trace).':'Sharp logo SVG (2-colour, scalable).';
+        const note=mode==='art'?'Colour-art SVG: 14 true hues, Chaikin-smooth borders.': mode==='hq'?'HQ colour SVG: 28 tones, fine smooth paths.': mode==='print'?'Print-detail B&W SVG.':'Sharp logo B&W SVG.';
         done(el,note,[[f.name.replace(/\.[^.]+$/,'')+'.svg', new Blob([svg],{type:'image/svg+xml'}),'Download SVG']]);
         continue;
       }
@@ -881,5 +919,5 @@ async function handle(files, tool){
 }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a403abdfbb3b94dd',t:'MTc5MDI3MjY0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a403bfc4fe8b3e46',t:'MTc5MDI3MzQ1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
