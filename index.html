@@ -137,9 +137,21 @@ function addScript(src){
   });
 }
 const LIBS={
-  PDFLib:['docs/vendor/pdf-lib.min.js','vendor/pdf-lib.min.js'],
-  ImageTracer:['docs/vendor/imagetracer.min.js','vendor/imagetracer.min.js'],
-  UTIF:['docs/vendor/utif.min.js','vendor/utif.min.js']
+  PDFLib:[
+    'docs/vendor/pdf-lib.min.js',
+    'vendor/pdf-lib.min.js',
+    'https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js'
+  ],
+  ImageTracer:[
+    'docs/vendor/imagetracer.min.js',
+    'vendor/imagetracer.min.js',
+    'https://cdn.jsdelivr.net/npm/imagetracerjs/imagetracer_v1.2.6.min.js'
+  ],
+  UTIF:[
+    'docs/vendor/utif.min.js',
+    'vendor/utif.min.js',
+    'https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js'
+  ]
 };
 async function need(flag){
   if(window[flag]) return true;
@@ -199,8 +211,52 @@ function be32(a,i){return ((a[i]<<24)|(a[i+1]<<16)|(a[i+2]<<8)|a[i+3])>>>0}
 
 function pdfLib(){
   const P=window.PDFLib;
-  if(!P||!P.PDFDocument) throw new Error('PDF engine loading… drop the file again in 2 seconds.');
-  return P;
+  return (P&&P.PDFDocument)?P:null;
+}
+function pdfEscape(s){
+  return String(s).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+}
+function vectorPdfFallback(draw, box){
+  const enc=new TextEncoder();
+  const parts=[]; let pos=0;
+  const push=u=>{parts.push(u); pos+=u.length};
+  const str=s=>push(enc.encode(s));
+  const xref=[];
+  const pw=box.pw, ph=box.ph;
+  let content=`0.05 0.05 0.05 RG
+0.6 w
+`;
+  for(const d of draw){
+    if(d.k==='L') content += `${d.x1.toFixed(2)} ${d.y1.toFixed(2)} m ${d.x2.toFixed(2)} ${d.y2.toFixed(2)} l S\n`;
+    else if(d.k==='A' || d.k==='C'){
+      const pts=d.k==='C' ? (()=>{
+        const out=[]; for(let i=0;i<=64;i++){ const t=Math.PI*2*i/64; out.push([d.x+d.r*Math.cos(t), d.y+d.r*Math.sin(t)]); } return out;
+      })() : (()=>{
+        const a0=d.a0*Math.PI/180, a1=d.a1*Math.PI/180, out=[]; const steps=48;
+        for(let i=0;i<=steps;i++){ const t=a0+(a1-a0)*i/steps; out.push([d.x+d.r*Math.cos(t), d.y+d.r*Math.sin(t)]); } return out;
+      })();
+      if(pts.length){
+        content += `${pts[0][0].toFixed(2)} ${pts[0][1].toFixed(2)} m `;
+        for(let i=1;i<pts.length;i++) content += `${pts[i][0].toFixed(2)} ${pts[i][1].toFixed(2)} l `;
+        content += `S\n`;
+      }
+    } else if(d.k==='T') {
+      content += `BT /F1 ${Math.max(6, d.h||10).toFixed(2)} Tf ${d.x.toFixed(2)} ${d.y.toFixed(2)} Td (${pdfEscape(String(d.t).slice(0,200))}) Tj ET\n`;
+    }
+  }
+  str('%PDF-1.4\n');
+  const obj=(n,body)=>{ xref[n]=pos; str(n+' 0 obj\n'+body+'\nendobj\n'); };
+  obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+  obj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+pw.toFixed(2)+' '+ph.toFixed(2)+'] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>');
+  obj(4,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  obj(5,'<< /Length '+enc.encode(content).length+' >>\nstream\n'+content+'endstream');
+  const startX=pos; str('xref\n0 6\n0000000000 65535 f \n');
+  for(let i=1;i<=5;i++) str(('0000000000'+xref[i]).slice(-10)+' 00000 n \n');
+  str('trailer << /Size 6 /Root 1 0 R >>\nstartxref\n'+startX+'\n%%EOF');
+  let n=0; parts.forEach(p=>n+=p.length);
+  const out=new Uint8Array(n); n=0; parts.forEach(p=>{out.set(p,n); n+=p.length});
+  return new Blob([out],{type:'application/pdf'});
 }
 
 async function canvasPng(c){return await new Promise((r,j)=>c.toBlob(b=>b?r(b):j(new Error('png')),'image/png'))}
@@ -404,6 +460,9 @@ async function psdFileToCanvas(buf){
 
 async function tiffToCanvas(buf){
   const raw=u8(buf);
+  if(!window.UTIF && window.__avNeed){
+    try{ await window.__avNeed('UTIF'); }catch(e){}
+  }
   const U=window.UTIF;
   if(U && U.decode){
     try{
@@ -422,7 +481,7 @@ async function tiffToCanvas(buf){
   }
   const imgs=findImageBlobs(raw);
   if(imgs[0]) return blobToCanvas(new Blob([imgs[0].bytes],{type:imgs[0].type}));
-  throw new Error('Could not read TIFF (need uncompressed/JPEG TIFF, or upload vendor/utif.min.js).');
+  throw new Error('Could not read TIFF. The page now tries a CDN UTIF fallback too, but this file still has no readable preview/image stream.');
 }
 
 function dibToCanvas(dib){
@@ -539,84 +598,134 @@ function parseDxf(text){
   const raw=text.split(/\r?\n/);
   const pairs=[];
   for(let i=0;i+1<raw.length;i+=2){
-    const code=parseInt(raw[i].trim(),10);
-    if(Number.isNaN(code)) {i--; continue;}
+    const code=parseInt(String(raw[i]).trim(),10);
+    if(Number.isNaN(code)) { i--; continue; }
     pairs.push([code, raw[i+1]]);
   }
-  const ents=[]; let cur=null; let inEnt=false;
-  for(const [code,val] of pairs){
+  const ents=[];
+  let section='';
+  let cur=null;
+  let poly=null;
+  function flush(){
+    if(!cur) return;
+    const t=String(cur.type||'').trim();
+    if(section==='ENTITIES'){
+      if(t==='VERTEX'){
+        if(poly && cur.x!=null && cur.y!=null) poly.pts.push([cur.x, cur.y]);
+      } else if(t==='POLYLINE'){
+        cur.pts=cur.pts||[];
+        ents.push(cur);
+        poly=cur;
+      } else if(t==='SEQEND'){
+        poly=null;
+      } else if(t!=='SECTION' && t!=='ENDSEC' && t!=='EOF'){
+        ents.push(cur);
+      }
+    }
+    cur=null;
+  }
+  for(const [code,val0] of pairs){
+    const val=String(val0||'');
     if(code===0){
-      const t=val.trim();
-      if(t==='SECTION'||t==='ENDSEC'||t==='EOF'||t==='TABLE'||t==='ENDTAB'){ cur=null; inEnt=false; continue; }
-      cur={type:t, pts:[], bulge:[]}; ents.push(cur); inEnt=true; continue;
+      flush();
+      cur={type:val.trim(), pts:[]};
+      continue;
     }
     if(!cur) continue;
+    if(cur.type==='SECTION' && code===2){ section=val.trim(); continue; }
+    if(section!=='ENTITIES') continue;
     const n=parseFloat(val);
     if(code===8) cur.layer=val.trim();
-    else if(code===1||code===7) cur.text=(cur.text||'')+val;
-    else if(code===10) cur.x=n;
-    else if(code===20){ cur.y=n; if(cur.type==='LWPOLYLINE'||cur.type==='VERTEX'){ cur.pts.push([cur.x,cur.y]); } }
+    else if(code===1||code===3) cur.text=(cur.text||'')+val;
+    else if(code===7) cur.font=val.trim();
+    else if(code===10){
+      if(cur.type==='LWPOLYLINE') cur._vx=n;
+      else cur.x=n;
+    }
+    else if(code===20){
+      if(cur.type==='LWPOLYLINE'){
+        cur.pts.push([cur._vx||0, n]);
+      } else {
+        cur.y=n;
+      }
+    }
     else if(code===11) cur.x2=n;
     else if(code===21) cur.y2=n;
-    else if(code===40) cur.r=n;
+    else if(code===40){
+      if(cur.type==='TEXT' || cur.type==='MTEXT') cur.h=n;
+      else cur.r=n;
+    }
     else if(code===50) cur.a0=n;
     else if(code===51) cur.a1=n;
-    else if(code===70) cur.flags=parseInt(val,10);
+    else if(code===70) cur.flags=parseInt(val,10)||0;
   }
+  flush();
   return ents;
 }
 async function dxfToPdf(text){
-  const {PDFDocument, rgb}=pdfLib();
   const ents=parseDxf(text);
   const draw=[];
   ents.forEach(e=>{
-    if(e.type==='LINE' && e.x!=null && e.x2!=null) draw.push({k:'L',x1:e.x,y1:e.y,x2:e.x2,y2:e.y2,layer:e.layer});
-    if((e.type==='LWPOLYLINE'||e.type==='POLYLINE') && e.pts.length){
+    if(e.type==='LINE' && e.x!=null && e.x2!=null && e.y!=null && e.y2!=null) draw.push({k:'L',x1:e.x,y1:e.y,x2:e.x2,y2:e.y2,layer:e.layer});
+    if((e.type==='LWPOLYLINE'||e.type==='POLYLINE') && e.pts && e.pts.length){
       for(let i=1;i<e.pts.length;i++) draw.push({k:'L',x1:e.pts[i-1][0],y1:e.pts[i-1][1],x2:e.pts[i][0],y2:e.pts[i][1],layer:e.layer});
-      if(e.flags&1 && e.pts.length>2) draw.push({k:'L',x1:e.pts[e.pts.length-1][0],y1:e.pts[e.pts.length-1][1],x2:e.pts[0][0],y2:e.pts[0][1],layer:e.layer});
+      if((e.flags&1) && e.pts.length>2) draw.push({k:'L',x1:e.pts[e.pts.length-1][0],y1:e.pts[e.pts.length-1][1],x2:e.pts[0][0],y2:e.pts[0][1],layer:e.layer});
     }
-    if(e.type==='CIRCLE' && e.r) draw.push({k:'C',x:e.x,y:e.y,r:e.r,layer:e.layer});
-    if(e.type==='ARC' && e.r!=null) draw.push({k:'A',x:e.x,y:e.y,r:e.r,a0:e.a0||0,a1:e.a1||360,layer:e.layer});
-    if(e.type==='TEXT' && e.text) draw.push({k:'T',x:e.x,y:e.y,t:e.text,h:e.r||10,layer:e.layer});
+    if(e.type==='CIRCLE' && e.r!=null && e.x!=null && e.y!=null) draw.push({k:'C',x:e.x,y:e.y,r:e.r,layer:e.layer});
+    if(e.type==='ARC' && e.r!=null && e.x!=null && e.y!=null) draw.push({k:'A',x:e.x,y:e.y,r:e.r,a0:e.a0||0,a1:e.a1||360,layer:e.layer});
+    if((e.type==='TEXT' || e.type==='MTEXT') && e.text && e.x!=null && e.y!=null) draw.push({k:'T',x:e.x,y:e.y,t:e.text,h:e.h||10,layer:e.layer});
   });
-  if(!draw.length) throw new Error('No drawable DXF entities (need ASCII DXF with LINE/POLYLINE/CIRCLE/TEXT).');
+  if(!draw.length) throw new Error('No drawable DXF entities found. Use ASCII DXF with LINE, LWPOLYLINE, POLYLINE, CIRCLE, ARC, TEXT or MTEXT.');
   let minX=1e15,minY=1e15,maxX=-1e15,maxY=-1e15;
   const touch=(x,y)=>{minX=Math.min(minX,x);minY=Math.min(minY,y);maxX=Math.max(maxX,x);maxY=Math.max(maxY,y)};
   draw.forEach(d=>{
-    if(d.k==='L'){touch(d.x1,d.y1);touch(d.x2,d.y2)}
-    if(d.k==='C'||d.k==='A'){touch(d.x-d.r,d.y-d.r);touch(d.x+d.r,d.y+d.r)}
-    if(d.k==='T') touch(d.x,d.y);
+    if(d.k==='L'){ touch(d.x1,d.y1); touch(d.x2,d.y2); }
+    if(d.k==='C'||d.k==='A'){ touch(d.x-d.r,d.y-d.r); touch(d.x+d.r,d.y+d.r); }
+    if(d.k==='T'){ touch(d.x,d.y); touch(d.x+((String(d.t).length||1)*(d.h||10)*0.65), d.y+(d.h||10)); }
   });
   const pad=20, W=maxX-minX||1, H=maxY-minY||1;
   const scale=Math.min(760/W, 520/H, 4);
   const pw=W*scale+pad*2, ph=H*scale+pad*2;
-  const pdf=await PDFDocument.create();
-  pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
-  const page=pdf.addPage([pw,ph]);
   const map=(x,y)=>({x:(x-minX)*scale+pad, y:(y-minY)*scale+pad});
-  const ink=rgb(0.05,0.05,0.05);
+  const mapped=[];
   for(const d of draw){
     if(d.k==='L'){
       const a=map(d.x1,d.y1), b=map(d.x2,d.y2);
-      page.drawLine({start:a,end:b,thickness:0.6,color:ink});
-    } else if(d.k==='C'){
+      mapped.push({k:'L',x1:a.x,y1:a.y,x2:b.x,y2:b.y});
+    } else if(d.k==='C') {
       const p=map(d.x,d.y);
-      page.drawCircle({x:p.x,y:p.y,size:d.r*scale,borderColor:ink,borderWidth:0.6,color:undefined});
-    } else if(d.k==='A'){
-      const steps=32; const a0=d.a0*Math.PI/180, a1=d.a1*Math.PI/180;
-      let last=null;
-      for(let i=0;i<=steps;i++){
-        const t=a0+(a1-a0)*i/steps;
-        const p=map(d.x+d.r*Math.cos(t), d.y+d.r*Math.sin(t));
-        if(last) page.drawLine({start:last,end:p,thickness:0.6,color:ink});
-        last=p;
-      }
-    } else if(d.k==='T'){
+      mapped.push({k:'C',x:p.x,y:p.y,r:d.r*scale});
+    } else if(d.k==='A') {
       const p=map(d.x,d.y);
-      page.drawText(String(d.t).slice(0,200),{x:p.x,y:p.y,size:Math.max(6, (d.h||10)*scale*0.8),color:ink});
+      mapped.push({k:'A',x:p.x,y:p.y,r:d.r*scale,a0:d.a0||0,a1:d.a1||360});
+    } else if(d.k==='T') {
+      const p=map(d.x,d.y);
+      mapped.push({k:'T',x:p.x,y:p.y,t:String(d.t).slice(0,200),h:Math.max(6, (d.h||10)*scale*0.8)});
     }
   }
-  return new Blob([await pdf.save()],{type:'application/pdf'});
+  const P=pdfLib();
+  if(P){
+    const {PDFDocument, rgb}=P;
+    const pdf=await PDFDocument.create();
+    pdf.setProducer('ArtViSiON · RJ Sarkar/Designer');
+    const page=pdf.addPage([pw,ph]);
+    const ink=rgb(0.05,0.05,0.05);
+    for(const d of mapped){
+      if(d.k==='L') page.drawLine({start:{x:d.x1,y:d.y1}, end:{x:d.x2,y:d.y2}, thickness:0.6, color:ink});
+      else if(d.k==='C') page.drawCircle({x:d.x,y:d.y,size:d.r,borderColor:ink,borderWidth:0.6,color:undefined});
+      else if(d.k==='A'){
+        const steps=32; const a0=d.a0*Math.PI/180, a1=d.a1*Math.PI/180; let last=null;
+        for(let i=0;i<=steps;i++){
+          const t=a0+(a1-a0)*i/steps;
+          const p={x:d.x+d.r*Math.cos(t), y:d.y+d.r*Math.sin(t)};
+          if(last) page.drawLine({start:last,end:p,thickness:0.6,color:ink});
+          last=p;
+        }
+      } else if(d.k==='T') page.drawText(d.t,{x:d.x,y:d.y,size:d.h,color:ink});
+    }
+    return new Blob([await pdf.save()],{type:'application/pdf'});
+  }
+  return vectorPdfFallback(mapped,{pw,ph});
 }
 
 function vecMode(){const el=document.querySelector('input[name=vecq]:checked'); return (el&&el.value)||'art'}
@@ -671,6 +780,63 @@ function kmeansPalette(id, k){
     for(let j=0;j<k;j++) if(acc[j][3]) pal[j]=[acc[j][0]/acc[j][3],acc[j][1]/acc[j][3],acc[j][2]/acc[j][3]];
   }
   return pal.map(c=>({r:Math.round(c[0]),g:Math.round(c[1]),b:Math.round(c[2]),a:255}));
+}
+
+function colorDist(r1,g1,b1,r2,g2,b2){
+  const dr=r1-r2, dg=g1-g2, db=b1-b2;
+  return 2*dr*dr + 4*dg*dg + 3*db*db;
+}
+function medianCutPalette(id, k){
+  const p=id.data, n=p.length/4;
+  const pts=[];
+  const step=Math.max(1, Math.floor(n/12000));
+  for(let i=0;i<n;i+=step){
+    const o=i*4;
+    if(p[o+3]===0) continue;
+    pts.push([p[o],p[o+1],p[o+2]]);
+  }
+  if(!pts.length) return [{r:255,g:255,b:255,a:255}];
+  let buckets=[pts];
+  while(buckets.length<k){
+    let bi=-1, span=-1, axis=0;
+    for(let i=0;i<buckets.length;i++){
+      const b=buckets[i];
+      if(b.length<2) continue;
+      let minR=255,maxR=0,minG=255,maxG=0,minB=255,maxB=0;
+      for(const c of b){
+        if(c[0]<minR) minR=c[0]; if(c[0]>maxR) maxR=c[0];
+        if(c[1]<minG) minG=c[1]; if(c[1]>maxG) maxG=c[1];
+        if(c[2]<minB) minB=c[2]; if(c[2]>maxB) maxB=c[2];
+      }
+      const spans=[maxR-minR,maxG-minG,maxB-minB];
+      const s=Math.max(...spans);
+      if(s>span){ span=s; bi=i; axis=spans.indexOf(s); }
+    }
+    if(bi<0) break;
+    const bucket=buckets.splice(bi,1)[0].sort((a,b)=>a[axis]-b[axis]);
+    const mid=Math.floor(bucket.length/2);
+    buckets.push(bucket.slice(0,mid), bucket.slice(mid));
+  }
+  const pal=buckets.filter(b=>b.length).map(b=>{
+    let r=0,g=0,bl=0;
+    for(const c of b){ r+=c[0]; g+=c[1]; bl+=c[2]; }
+    return [r/b.length, g/b.length, bl/b.length];
+  });
+  while(pal.length<k) pal.push(pal[pal.length-1].slice());
+  // light refinement for cleaner colour grouping
+  for(let it=0;it<4;it++){
+    const acc=pal.map(()=>[0,0,0,0]);
+    for(const c of pts){
+      let best=0, bd=1e15;
+      for(let i=0;i<pal.length;i++){
+        const d=colorDist(c[0],c[1],c[2], pal[i][0],pal[i][1],pal[i][2]);
+        if(d<bd){ bd=d; best=i; }
+      }
+      acc[best][0]+=c[0]; acc[best][1]+=c[1]; acc[best][2]+=c[2]; acc[best][3]++;
+    }
+    for(let i=0;i<pal.length;i++) if(acc[i][3]) pal[i]=[acc[i][0]/acc[i][3], acc[i][1]/acc[i][3], acc[i][2]/acc[i][3]];
+  }
+  return pal.map(c=>({r:Math.round(c[0]), g:Math.round(c[1]), b:Math.round(c[2]), a:255}));
 }
 function applyPalette(id, pal){
   const p=id.data, idx=new Uint16Array(p.length/4);
@@ -910,7 +1076,7 @@ function bindEyedrop(canvas, live){
 async function anyFileToCanvas(f){
   const e=ext(f.name);
   if(e==='tif'||e==='tiff') return tiffToCanvas(await f.arrayBuffer());
-  if(e==='psd'||e==='psb') return psdToCanvas(await f.arrayBuffer());
+  if(e==='psd'||e==='psb') return psdFileToCanvas(await f.arrayBuffer());
   if(e==='svg') return blobToCanvas(new Blob([await f.text()],{type:'image/svg+xml'}));
   if(e==='cdr'||e==='ai'||e==='eps'){
     const got=await previewFromBinary(await f.arrayBuffer());
@@ -961,6 +1127,14 @@ async function handle(files, tool){
       }
       /* PDF tab — every listed format */
       if(e==='pdf'){ done(el,'Already PDF.',[[f.name,f,'Download PDF']]); continue; }
+      if(e==='dxf'){
+        if(window.__avNeed){
+          try{ await window.__avNeed('PDFLib'); }catch(x){}
+        }
+        const pdf=await dxfToPdf(await f.text());
+        done(el,'DXF drawing → vector PDF.',[[f.name.replace(/\.[^.]+$/,'')+'.pdf',pdf,'Download PDF']]);
+        continue;
+      }
       if(e==='ai'||e==='eps'||e==='cdr'){
         try{
           const got=await previewFromBinary(await f.arrayBuffer());
@@ -994,5 +1168,7 @@ async function handle(files, tool){
 }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4044daf9ff2ff99',t:'MTc5MDI3OTI3Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
+</html>
+
 </html>
