@@ -21753,14 +21753,35 @@ module.exports = ZStream;
     const a = u8(buf);
     if (a[0] !== 0x50 || a[1] !== 0x4b) return [];
     const out = [];
-    let i = 0;
-    while (i + 30 < a.length && a[i] === 0x50 && a[i + 1] === 0x4b && a[i + 2] === 3 && a[i + 3] === 4) {
-      const method = le16(a, i + 8);
-      const compSize = le32(a, i + 18);
-      const nameLen = le16(a, i + 26);
-      const extraLen = le16(a, i + 28);
-      const name = new TextDecoder().decode(a.subarray(i + 30, i + 30 + nameLen));
-      const start = i + 30 + nameLen + extraLen;
+    const min = Math.max(0, a.length - 0xffff - 22 - 20);
+    let eocd = -1;
+    for (let i = a.length - 22; i >= min; i--) {
+      if (a[i] === 0x50 && a[i + 1] === 0x4b && a[i + 2] === 0x05 && a[i + 3] === 0x06) {
+        eocd = i;
+        break;
+      }
+    }
+    if (eocd < 0) return out;
+    const total = le16(a, eocd + 10);
+    const cdSize = le32(a, eocd + 12);
+    const cdOffset = le32(a, eocd + 16);
+    if (!cdOffset || cdOffset >= a.length) return out;
+    let p = cdOffset;
+    for (let n = 0; n < total && p + 46 <= a.length && p < cdOffset + cdSize; n++) {
+      if (!(a[p] === 0x50 && a[p + 1] === 0x4b && a[p + 2] === 0x01 && a[p + 3] === 0x02)) break;
+      const method = le16(a, p + 10);
+      const compSize = le32(a, p + 20);
+      const nameLen = le16(a, p + 28);
+      const extraLen = le16(a, p + 30);
+      const commentLen = le16(a, p + 32);
+      const localOffset = le32(a, p + 42);
+      const name = new TextDecoder().decode(a.subarray(p + 46, p + 46 + nameLen));
+      p += 46 + nameLen + extraLen + commentLen;
+      if (localOffset + 30 > a.length) continue;
+      if (!(a[localOffset] === 0x50 && a[localOffset + 1] === 0x4b && a[localOffset + 2] === 0x03 && a[localOffset + 3] === 0x04)) continue;
+      const localNameLen = le16(a, localOffset + 26);
+      const localExtraLen = le16(a, localOffset + 28);
+      const start = localOffset + 30 + localNameLen + localExtraLen;
       const payload = a.subarray(start, start + compSize);
       let data = null;
       try {
@@ -21768,8 +21789,7 @@ module.exports = ZStream;
       } catch (_) {
         data = null;
       }
-      if (data) out.push({ name, data });
-      i = start + compSize;
+      if (data) out.push({ name, data, method, compSize });
     }
     return out;
   }
@@ -21893,6 +21913,18 @@ module.exports = ZStream;
     }
     return best;
   }
+  function zipPreviewScore(name) {
+    const n = String(name || '').replace(/\\/g, '/').toLowerCase();
+    if (n === 'previews/thumbnail.png') return 100;
+    if (n.startsWith('previews/') && n.endsWith('.png')) return 95;
+    if (n === 'metadata/thumbnails/thumbnail.bmp') return 92;
+    if (n.includes('/thumbnail.') || n.includes('/thumb.') || n.includes('/preview.')) return 88;
+    if (n.endsWith('.png')) return 72;
+    if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 68;
+    if (n.endsWith('.bmp')) return 66;
+    if (n.endsWith('.pdf')) return 60;
+    return /thumbnail|thumb|preview/i.test(n) ? 58 : 0;
+  }
   async function previewFromBinary(buf) {
     const bytes = u8(buf);
     const pdfRange = findPdfRange(bytes);
@@ -21900,14 +21932,24 @@ module.exports = ZStream;
 
     if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
       const entries = await unzipEntries(bytes);
-      const preferred = entries.filter(e => /thumbnail|thumb|preview|\.png$|\.jpe?g$|\.bmp$/i.test(e.name));
-      for (const entry of preferred.concat(entries)) {
+      const ranked = entries
+        .map(entry => ({ entry, score: zipPreviewScore(entry.name) }))
+        .sort((a, b) => b.score - a.score || b.entry.data.length - a.entry.data.length)
+        .map(x => x.entry);
+      for (const entry of ranked) {
         const pdf2 = findPdfRange(entry.data);
         if (pdf2) return { pdf: new Blob([entry.data.slice(pdf2.start, pdf2.end)], { type: 'application/pdf' }) };
         try {
-          if (/\.bmp$/i.test(entry.name) && entry.data[0] === 0x42) return { canvas: await blobToCanvas(new Blob([entry.data], { type: 'image/bmp' })) };
+          if (/\.bmp$/i.test(entry.name) && entry.data[0] === 0x42) {
+            return { canvas: await blobToCanvas(new Blob([entry.data], { type: 'image/bmp' })) };
+          }
           const imgs = findImageBlobs(entry.data);
-          if (imgs[0]) return { canvas: await blobToCanvas(new Blob([imgs[0].bytes], { type: imgs[0].type })) };
+          if (imgs[0]) {
+            return { canvas: await blobToCanvas(new Blob([imgs[0].bytes], { type: imgs[0].type })) };
+          }
+          if (entry.data[0] === 0x42 && entry.data[1] === 0x4d) {
+            return { canvas: await blobToCanvas(new Blob([entry.data], { type: 'image/bmp' })) };
+          }
         } catch (_) {}
       }
     }
@@ -21918,7 +21960,7 @@ module.exports = ZStream;
     const imgs = findImageBlobs(bytes);
     if (imgs[0]) return { canvas: await blobToCanvas(new Blob([imgs[0].bytes], { type: imgs[0].type })) };
 
-    throw new Error('No embedded preview or PDF stream found in this file. Re-save from Illustrator/Corel as PDF-compatible AI or export a PDF.');
+    throw new Error('No embedded preview or PDF stream found in this file. For CDR use a version that contains previews/thumbnail.png or metadata/thumbnails/thumbnail.bmp, or export PDF from CorelDRAW.');
   }
 
   function psdThumbnailJpeg(a) {
@@ -22264,11 +22306,35 @@ module.exports = ZStream;
       desc: false
     };
   }
+  function sealSvgSeams(svg, mode) {
+    if (!svg || (mode !== 'art' && mode !== 'hq')) return svg;
+    try {
+      const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      const root = doc.documentElement;
+      const bleed = mode === 'hq' ? 0.7 : 1.0;
+      root.setAttribute('shape-rendering', 'geometricPrecision');
+      root.setAttribute('text-rendering', 'geometricPrecision');
+      root.querySelectorAll('path,polygon,polyline,rect,circle,ellipse').forEach(el => {
+        const fill = el.getAttribute('fill');
+        if (!fill || fill === 'none' || /^url\(/i.test(fill)) return;
+        el.setAttribute('stroke', fill);
+        el.setAttribute('stroke-width', String(bleed));
+        el.setAttribute('stroke-linejoin', 'round');
+        el.setAttribute('stroke-linecap', 'round');
+        el.setAttribute('paint-order', 'stroke fill');
+        if (!el.getAttribute('stroke-opacity')) el.setAttribute('stroke-opacity', '1');
+      });
+      return new XMLSerializer().serializeToString(root);
+    } catch (_) {
+      return svg;
+    }
+  }
   async function vectorizeCanvas(src, mode) {
     if (!window.ImageTracer || !window.ImageTracer.imagedataToSVG) throw new Error('Vector engine not loaded.');
     const c = prepVectorCanvas(src, mode);
     const id = c.getContext('2d').getImageData(0, 0, c.width, c.height);
-    return window.ImageTracer.imagedataToSVG(id, vectorOptions(mode));
+    const svg = window.ImageTracer.imagedataToSVG(id, vectorOptions(mode));
+    return sealSvgSeams(svg, mode);
   }
 
   function rgbToHex(r, g, b) {
@@ -22375,17 +22441,80 @@ module.exports = ZStream;
     items.forEach(x => { if (!unique.some(y => y.hex === x.hex)) unique.push(x); });
     return unique.slice(0, k);
   }
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s;
+    const l = (max + min) / 2;
+    if (max === min) { h = s = 0; }
+    else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        default: h = (r - g) / d + 4;
+      }
+      h /= 6;
+    }
+    return { h, s, l };
+  }
+  function hslToRgb(h, s, l) {
+    if (s === 0) {
+      const v = Math.round(l * 255);
+      return [v, v, v];
+    }
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    return [
+      Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+      Math.round(hue2rgb(p, q, h) * 255),
+      Math.round(hue2rgb(p, q, h - 1 / 3) * 255)
+    ];
+  }
+  function matteDotGain(v, amount) {
+    return Math.min(1, Math.max(0, v + amount * Math.sin(Math.PI * v)));
+  }
   function rgbToCmykProof(src) {
     const c = cloneCanvas(src);
     const g = c.getContext('2d');
     const id = g.getImageData(0, 0, c.width, c.height);
     const p = id.data;
+    const paper = [244, 239, 231];
     for (let i = 0; i < p.length; i += 4) {
-      const cmyk = rgbToCmyk(p[i], p[i + 1], p[i + 2]);
-      const kk = cmyk.k / 100, cc = cmyk.c / 100, mm = cmyk.m / 100, yy = cmyk.y / 100;
-      p[i] = Math.round(255 * (1 - cc) * (1 - kk));
-      p[i + 1] = Math.round(255 * (1 - mm) * (1 - kk));
-      p[i + 2] = Math.round(255 * (1 - yy) * (1 - kk));
+      let cc, mm, yy, kk;
+      const R = p[i] / 255, G = p[i + 1] / 255, B = p[i + 2] / 255;
+      const k0 = 1 - Math.max(R, G, B);
+      if (k0 >= 0.999) {
+        cc = mm = yy = 0; kk = 1;
+      } else {
+        cc = (1 - R - k0) / (1 - k0);
+        mm = (1 - G - k0) / (1 - k0);
+        yy = (1 - B - k0) / (1 - k0);
+        kk = k0;
+      }
+      cc = matteDotGain(cc, 0.10);
+      mm = matteDotGain(mm, 0.10);
+      yy = matteDotGain(yy, 0.10);
+      kk = matteDotGain(kk, 0.16);
+      let rr = paper[0] * (1 - cc) * (1 - kk);
+      let gg = paper[1] * (1 - mm) * (1 - kk);
+      let bb = paper[2] * (1 - yy) * (1 - kk);
+      const hsl = rgbToHsl(rr, gg, bb);
+      const sat = hsl.s * 0.82;
+      const light = Math.max(0, Math.min(1, hsl.l * 0.97 + 0.01));
+      [rr, gg, bb] = hslToRgb(hsl.h, sat, light);
+      p[i] = rr;
+      p[i + 1] = gg;
+      p[i + 2] = bb;
       p[i + 3] = 255;
     }
     g.putImageData(id, 0, 0);
@@ -22463,7 +22592,7 @@ module.exports = ZStream;
             const pdf = await canvasesToPdf([got.canvas], dpi, file.name);
             setProgress(card, 100);
             setStatus(card, 'done');
-            setNote(card, e === 'cdr' ? 'Embedded preview converted to PDF. If you need live Corel vector objects, export PDF from CorelDRAW.' : 'Embedded preview converted to PDF.');
+            setNote(card, e === 'cdr' ? 'Embedded CDR preview converted to PDF. Modern CDR ZIP previews and legacy thumbnail BMP previews are both checked.' : 'Embedded preview converted to PDF.');
             addDownload(card, file.name.replace(/\.[^.]+$/, '') + '.pdf', pdf, 'Download PDF');
             continue;
           }
@@ -22512,8 +22641,8 @@ module.exports = ZStream;
         setProgress(card, 100);
         setStatus(card, 'done');
         const noteMap = {
-          art: 'Professional colour-art SVG generated with smooth traced paths and reduced palette.',
-          hq: 'High-detail colour SVG generated with more tones and tighter tracing tolerances.',
+          art: 'Professional colour-art SVG generated with seam-closed colour joins and reduced palette.',
+          hq: 'High-detail colour SVG generated with seam-closed colour joins, more tones and tighter tracing tolerances.',
           logo: 'Sharp black-and-white logo SVG generated for clean branding use.',
           print: 'High-detail black-and-white SVG generated for print workflows.'
         };
@@ -22557,7 +22686,7 @@ module.exports = ZStream;
         const reportBlob = paletteReport(file.name, tones);
         setProgress(card, 100);
         setStatus(card, 'done');
-        setNote(card, 'RGB/HEX/CMYK/Pantone analysis ready. Pantone values are nearest-library approximations using Lab + DeltaE matching.');
+        setNote(card, 'RGB/HEX/CMYK/Pantone analysis ready. CMYK preview is now shown as a matte print-style soft proof. Pantone values are nearest-library approximations using Lab + DeltaE matching.');
         addDownload(card, file.name.replace(/\.[^.]+$/, '') + '_cmyk_proof.jpg', proofBlob, 'Download CMYK proof');
         addDownload(card, file.name.replace(/\.[^.]+$/, '') + '_palette_report.txt', reportBlob, 'Download palette report');
 
@@ -22594,5 +22723,5 @@ module.exports = ZStream;
   wireDrop('color', files => files.length && handleColor(files));
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a411bb6b4a541211',t:'MTc5MDQyMDA4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
